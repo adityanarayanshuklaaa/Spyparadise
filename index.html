@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#0b1219">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -42,8 +42,9 @@
   #chips{display:flex;flex-direction:column;gap:2px}
   #layers.collapsed #chips{display:none}
   .lhead{display:flex;justify-content:space-between;align-items:center;width:100%;padding:8px 10px;min-height:38px;font-size:12px;font-weight:600;color:var(--dim)}
-  #camJump{padding:4px 8px 6px;display:flex;flex-wrap:wrap;gap:6px}
-  #camJump span{width:100%;color:var(--dim);font-size:11.5px}
+  #camJump,#baseRow{padding:4px 8px 6px;display:flex;flex-wrap:wrap;gap:6px}
+  #camJump span,#baseRow span{width:100%;color:var(--dim);font-size:11.5px}
+  .mini.on{background:var(--ink);color:#0b1219;border-color:transparent;font-weight:600}
   .mini{padding:7px 11px;border:1px solid var(--line);border-radius:999px;font-size:12.5px;min-height:36px}
   #styles h2{margin:4px 8px 2px;font-size:11px;font-weight:600;color:var(--dim);letter-spacing:.02em}
   .chip{display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:10px;min-height:44px;text-align:left;width:100%}
@@ -54,7 +55,7 @@
   .chip.err .cnt{color:var(--coral)}
   .chip.on{background:rgba(120,170,220,.12)}
 
-  #styles{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(64px + var(--safe-b));z-index:5;padding:6px 8px;max-width:calc(100vw - 20px)}
+  #styles{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(98px + var(--safe-b));z-index:5;padding:6px 8px;max-width:calc(100vw - 20px)}
   #styles .row{display:flex;gap:4px;overflow-x:auto}
   .sty{padding:9px 13px;border-radius:10px;white-space:nowrap;min-height:40px;color:var(--dim)}
   .sty.on{background:var(--ink);color:#0b1219;font-weight:600}
@@ -73,29 +74,29 @@
   #lightbox{position:fixed;inset:0;z-index:30;background:rgba(5,9,14,.92);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:12px}
   #lightbox img{max-width:96vw;max-height:80vh;border-radius:8px}
   @media (max-width:900px){
-    #card{left:10px;right:10px;width:auto;top:auto;bottom:calc(150px + var(--safe-b));max-height:42vh}
+    #card{left:10px;right:10px;width:auto;top:auto;bottom:calc(190px + var(--safe-b));max-height:42vh}
   }
   @media (max-width:700px){
     #search{flex-basis:100%;order:5}
     .tbtn{padding:8px 12px;min-height:40px}
     #hud{display:none}
-    #styles{bottom:calc(34px + var(--safe-b))}
-    #card{bottom:calc(122px + var(--safe-b))}
-    #exitCockpit{bottom:calc(110px + var(--safe-b))}
+    #styles{bottom:calc(96px + var(--safe-b))}
+    #card{bottom:calc(182px + var(--safe-b))}
+    #exitCockpit{bottom:calc(170px + var(--safe-b))}
     #layers{max-height:calc(100vh - 340px)}
   }
   @media (max-width:480px){ #brand{display:none} }
   @media (max-height:520px){
     #hud{display:none}
-    #styles{bottom:calc(30px + var(--safe-b))}
-    #card{max-height:56vh;bottom:calc(100px + var(--safe-b))}
+    #styles{bottom:calc(84px + var(--safe-b))}
+    #card{max-height:56vh;bottom:calc(140px + var(--safe-b))}
     #layers{max-height:calc(100vh - 150px)}
   }
 
-  #hud{position:fixed;left:10px;bottom:calc(30px + var(--safe-b));z-index:4;padding:7px 12px;font-size:12px;color:var(--dim);display:flex;gap:14px;flex-wrap:wrap;max-width:calc(100vw - 20px)}
+  #hud{position:fixed;left:10px;bottom:calc(98px + var(--safe-b));z-index:4;padding:7px 12px;font-size:12px;color:var(--dim);display:flex;gap:4px 14px;flex-wrap:wrap;max-width:340px}
   #hud b{color:var(--ink);font-weight:500}
   #toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(64px + var(--safe-t));z-index:9;padding:9px 14px;display:none;max-width:90vw}
-  #exitCockpit{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(130px + var(--safe-b));z-index:7;padding:12px 20px;display:none;font-weight:600}
+  #exitCockpit{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(170px + var(--safe-b));z-index:7;padding:12px 20px;display:none;font-weight:600}
   #reticle{position:fixed;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border:1.5px solid rgba(255,255,255,.55);border-radius:50%;z-index:3;pointer-events:none;display:none}
   #reticle:before,#reticle:after{content:"";position:absolute;background:rgba(255,255,255,.55)}
   #reticle:before{left:50%;top:-9px;width:1.5px;height:64px;margin-left:-.75px}
@@ -117,6 +118,13 @@
   .replay input{flex:1;min-width:0}
   #camattr{font-size:12px;color:var(--dim);margin:0 0 10px}
   #camattr a{color:var(--sky)}
+  #cmd{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(30px + var(--safe-b));width:min(780px,calc(100vw - 20px));z-index:8;display:flex;flex-direction:column;gap:6px}
+  #cmdmsg{padding:9px 13px;font-size:13px;max-height:30vh;overflow:auto;display:none}
+  #cmdform{display:flex;align-items:stretch;overflow:hidden}
+  #cmdin{flex:1;min-width:0;background:none;border:0;color:var(--ink);font:inherit;font-size:15px;padding:13px 14px;outline:0}
+  #cmdin::placeholder{color:var(--dim)}
+  #cmdform button{padding:0 16px;min-height:48px;font-weight:600;color:var(--sky)}
+  #mic{display:none}
 </style>
 </head>
 <body>
@@ -150,6 +158,15 @@
 
 <div id="hud" class="panel num"></div>
 
+<div id="cmd">
+  <div id="cmdmsg" class="panel" role="status" aria-live="polite"></div>
+  <form id="cmdform" class="panel" autocomplete="off">
+    <input id="cmdin" type="text" enterkeyhint="go" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type a command: go to India, Uttar Pradesh, Azamgarh" aria-label="Type a command">
+    <button type="button" id="mic" aria-label="Speak a command">Mic</button>
+    <button type="submit" id="runcmd">Run</button>
+  </form>
+</div>
+
 <div id="dlg" class="dlg">
   <div class="box panel">
     <h3>Settings and sources</h3>
@@ -159,6 +176,9 @@
       <button class="act pri" id="ionSave">Save and reload</button>
       <button class="act" id="ionClear">Remove token</button>
     </div>
+    <p style="margin-top:16px"><b style="color:var(--ink)">AI commands (optional).</b> The command bar already understands commands like "go to India, Uttar Pradesh, Azamgarh" or "cctv of Oxford Street, London" with no key. To also understand free-form sentences, paste an Anthropic API key. Using it costs a small amount on your Anthropic account. It stays in this browser, and anyone who uses your browser could see it, so do not use this on a shared device.</p>
+    <input id="aiTok" placeholder="Anthropic API key (optional)" autocomplete="off">
+    <div class="acts"><button class="act pri" id="aiSave">Save key</button><button class="act" id="aiClear">Remove key</button></div>
     <p style="margin-top:16px"><b style="color:var(--ink)">India cameras (Windy).</b> A free key from <a href="https://api.windy.com/keys" target="_blank" rel="noopener">api.windy.com/keys</a> adds webcams across India (city, tourist and weather cameras). Their free plan shows a new photo every 5 to 15 minutes, has daily limits, and needs a credit to windy.com, which the app shows. The key stays in this browser.</p>
     <input id="windyTok" placeholder="Windy Webcams API key" autocomplete="off">
     <div class="acts"><button class="act pri" id="windySave">Save and reload</button><button class="act" id="windyClear">Remove key</button></div>
@@ -196,22 +216,41 @@ const $ = s => document.querySelector(s);
 const ionToken = localStorage.getItem("eoe_ion") || "";
 if (ionToken) CS.Ion.defaultAccessToken = ionToken;
 
-const esri = new CS.UrlTemplateImageryProvider({
-  url: "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-  maximumLevel: 19,
-  credit: "Imagery © Esri, Maxar, Earthstar Geographics"
-});
-
 const small = window.matchMedia("(max-width:700px)").matches;
+const touch = ("ontouchstart" in window) || navigator.maxTouchPoints>0;
 const viewer = new CS.Viewer("globe", {
-  baseLayer: new CS.ImageryLayer(esri),
+  baseLayer:false,
   baseLayerPicker:false, geocoder:false, homeButton:false, sceneModePicker:false,
   navigationHelpButton:false, fullscreenButton:false, animation:false, timeline:false,
-  infoBox:false, selectionIndicator:false, msaaSamples:small?1:2
+  infoBox:false, selectionIndicator:false, msaaSamples:1
 });
 viewer.useBrowserRecommendedResolution=false;
-viewer.resolutionScale=Math.min(window.devicePixelRatio||1, small?1.5:2);
+viewer.resolutionScale=Math.min(window.devicePixelRatio||1, small?1.25:1.5);
+viewer.targetFrameRate=touch?30:60;
 const scene = viewer.scene, camera = viewer.camera;
+scene.globe.maximumScreenSpaceError = touch?3:2;
+scene.fog.enabled = false;
+scene.postProcessStages.fxaa.enabled = !touch;
+
+/* ---------- base maps ---------- */
+const ESRI="https://services.arcgisonline.com/ArcGIS/rest/services/";
+const esriTile=(path,max,credit)=>new CS.UrlTemplateImageryProvider({url:ESRI+path+"/MapServer/tile/{z}/{y}/{x}",maximumLevel:max,credit});
+const BASES={
+  hybrid:()=>[
+    esriTile("World_Imagery",19,"Imagery © Esri, Maxar, Earthstar Geographics"),
+    esriTile("Reference/World_Transportation",15,"Roads © Esri"),
+    esriTile("Reference/World_Boundaries_and_Places",15,"Borders and places © Esri")],
+  streets:()=>[esriTile("World_Street_Map",19,"Map © Esri, HERE, Garmin, OpenStreetMap contributors")],
+  dark:()=>[new CS.UrlTemplateImageryProvider({url:"https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",subdomains:["a","b","c","d"],maximumLevel:19,credit:"© OpenStreetMap contributors © CARTO"})]
+};
+let baseName="hybrid";
+function markBase(){ document.querySelectorAll("[data-base]").forEach(b=>b.classList.toggle("on",b.dataset.base===baseName)); }
+function setBase(name){
+  const f=BASES[name]; if(!f) return false;
+  viewer.imageryLayers.removeAll(); f().forEach(pv=>viewer.imageryLayers.addImageryProvider(pv));
+  baseName=name; markBase(); return true;
+}
+setBase("hybrid");
 scene.globe.enableLighting = false;
 scene.highDynamicRange = false;
 scene.skyAtmosphere.show = true;
@@ -270,6 +309,10 @@ jumpBox.addEventListener("click",e=>{
   if(j[0]==="India"&&!windyKey&&!myCams.length){ toast("India cameras come from Windy. Add a free key in Settings, or add your own camera."); setTimeout(()=>$("#gear").click(),1200); }
 });
 $("#layersHead").addEventListener("click",()=>{ const l=$("#layers"); const c=l.classList.toggle("collapsed"); $("#lhint").textContent=c?"show":"hide"; $("#layersHead").setAttribute("aria-expanded",String(!c)); });
+const baseBox=document.createElement("div"); baseBox.id="baseRow";
+baseBox.innerHTML="<span>Map style</span>"+[["hybrid","Satellite + labels"],["streets","Streets"],["dark","Dark"]].map(b=>'<button class="mini" data-base="'+b[0]+'">'+b[1]+'</button>').join("");
+$("#chips").insertBefore(baseBox,$("#chips").firstChild); markBase();
+baseBox.addEventListener("click",e=>{ const b=e.target.closest("[data-base]"); if(b) setBase(b.dataset.base); });
 if(small){ $("#layers").classList.add("collapsed"); $("#lhint").textContent="show"; $("#layersHead").setAttribute("aria-expanded","false"); }
 
 /* ---------- aircraft ---------- */
@@ -309,17 +352,17 @@ function upsert(store, list){
   for(const [k,o] of store.map){ if(!seen.has(k)){ store.bb.remove(o.bb); store.map.delete(k); } }
 }
 function parseAdsb(j, forceMil){
-  return (j.ac||[]).map(a=>({
+  return (j.ac||j.aircraft||[]).map(a=>({
     key:a.hex, lat:a.lat, lon:a.lon,
     alt:(typeof a.alt_baro==="number")?a.alt_baro*0.3048:0,
     gnd:a.alt_baro==="ground",
     spd:(a.gs||0)*0.5144, trk:(a.track!=null?a.track:(a.true_heading||0)),
     call:(a.flight||"").trim()||a.r||a.hex, type:a.t||"", reg:a.r||"",
-    mil:!!forceMil||((a.dbFlags||0)&1)===1, src:"adsb.lol"
+    mil:!!forceMil||((a.dbFlags||0)&1)===1, src:"ADS-B network"
   }));
 }
 function parseOpenSky(j){
-  const st=j.states||[]; const step=Math.max(1,Math.ceil(st.length/5000)); const out=[];
+  const st=j.states||[]; const step=Math.max(1,Math.ceil(st.length/3000)); const out=[];
   for(let i=0;i<st.length;i+=step){
     const s=st[i]; if(s[5]==null||s[6]==null) continue;
     out.push({key:s[0],lat:s[6],lon:s[5],alt:(s[13]!=null?s[13]:(s[7]||0)),gnd:!!s[8],spd:s[9]||0,trk:s[10]||0,
@@ -327,38 +370,58 @@ function parseOpenSky(j){
   }
   return out;
 }
-let lastOpenSky=0;
-async function pollFlights(){
-  if(!layerOn.flights) return;
+const HUBS=[[40.6,-73.8],[34,-118.4],[41.9,-87.9],[33.6,-84.4],[51.5,-0.5],[50,8.5],[48.9,2.5],[41,29],[25.2,55.4],[28.6,77.1],[19.1,72.9],[13.1,80.2],[1.4,103.9],[35.5,139.8],[31.2,121.8],[22.3,114.2],[-33.9,151.2],[-23.5,-46.6],[-26.1,28.2],[30,31]];
+function samplePoints(){
   const h=camera.positionCartographic.height;
-  try{
-    if(h>2.5e6){
-      if(Date.now()-lastOpenSky<60000) return;
-      lastOpenSky=Date.now();
-      const j=await getJSON("https://opensky-network.org/api/states/all",25000);
-      upsert(stores.flights, parseOpenSky(j));
-    } else {
-      const c=viewCenter(); const nm=Math.round(Math.min(250,Math.max(30,h/1852*0.7)));
-      let list;
-      try{
-        const j=await getJSON("https://api.adsb.lol/v2/point/"+c.lat.toFixed(3)+"/"+c.lon.toFixed(3)+"/"+nm);
-        list=parseAdsb(j,false).filter(a=>!a.mil);
-      }catch(e1){
-        const d=nm/60, q="lamin="+(c.lat-d).toFixed(2)+"&lamax="+(c.lat+d).toFixed(2)+"&lomin="+(c.lon-d*1.3).toFixed(2)+"&lomax="+(c.lon+d*1.3).toFixed(2);
-        list=parseOpenSky(await getJSON("https://opensky-network.org/api/states/all?"+q));
-      }
-      upsert(stores.flights,list);
+  if(h>3e6) return {pts:HUBS, nm:250};
+  const c=viewCenter(); const nm=Math.round(Math.min(250,Math.max(25,h/1852*0.8)));
+  const pts=[[c.lat,c.lon]];
+  if(h>4e5){
+    const step=nm*1.852*1.5/111;
+    for(let a=0;a<360;a+=60){
+      const la=c.lat+step*Math.cos(rad(a)), lo=c.lon+step*Math.sin(rad(a))/Math.max(.2,Math.cos(rad(c.lat)));
+      pts.push([Math.max(-85,Math.min(85,la)),((lo+540)%360)-180]);
     }
-    setCount("flights",fmt(stores.flights.map.size));
-  }catch(e){ console.warn("flights",e); setCount("flights","no data",true); }
+  }
+  return {pts,nm};
+}
+async function fetchPoint(lat,lon,nm){
+  const la=lat.toFixed(3), lo=lon.toFixed(3); let last;
+  const urls=["https://api.adsb.lol/v2/point/"+la+"/"+lo+"/"+nm,"https://api.airplanes.live/v2/point/"+la+"/"+lo+"/"+nm,"https://opendata.adsb.fi/api/v2/lat/"+la+"/lon/"+lo+"/dist/"+nm];
+  for(const u of urls){ try{ return await getJSON(u,10000); }catch(e){ last=e; } }
+  throw last;
+}
+let polling=false, flightWarned=false, lastGlobal=0;
+async function pollFlights(){
+  if(!layerOn.flights||polling) return;
+  if(camera.positionCartographic.height>3e6){ if(Date.now()-lastGlobal<45000) return; lastGlobal=Date.now(); }
+  polling=true;
+  try{
+    const s=samplePoints();
+    const res=await Promise.allSettled(s.pts.map(pt=>fetchPoint(pt[0],pt[1],s.nm)));
+    const map=new Map(); let ok=0;
+    res.forEach(r=>{ if(r.status==="fulfilled"){ ok++; parseAdsb(r.value,false).forEach(a=>{ if(!a.mil&&a.key) map.set(a.key,a); }); } });
+    let list=[...map.values()];
+    if(!ok){
+      const h=camera.positionCartographic.height; let url="https://opensky-network.org/api/states/all";
+      if(h<=2.5e6){ const c=viewCenter(), d=s.nm/60; url+="?lamin="+(c.lat-d).toFixed(2)+"&lamax="+(c.lat+d).toFixed(2)+"&lomin="+(c.lon-d*1.3).toFixed(2)+"&lomax="+(c.lon+d*1.3).toFixed(2); }
+      list=parseOpenSky(await getJSON(url,25000));
+    }
+    if(list.length>3500) list=list.slice(0,3500);
+    upsert(stores.flights,list);
+    setCount("flights",fmt(stores.flights.map.size)); flightWarned=false;
+  }catch(e){
+    console.warn("flights",e); setCount("flights","unavailable",true);
+    if(!flightWarned){ flightWarned=true; toast("Live flight feeds could not be reached. Your network or browser may be blocking them."); }
+  }finally{ polling=false; }
 }
 async function pollMil(){
   if(!layerOn.mil) return;
   try{
-    const j=await getJSON("https://api.adsb.lol/v2/mil");
+    let j; try{ j=await getJSON("https://api.adsb.lol/v2/mil"); }catch(e){ j=await getJSON("https://api.airplanes.live/v2/mil"); }
     upsert(stores.mil,parseAdsb(j,true));
     setCount("mil",fmt(stores.mil.map.size));
-  }catch(e){ console.warn("mil",e); setCount("mil","no data",true); }
+  }catch(e){ console.warn("mil",e); setCount("mil","unavailable",true); }
 }
 function advance(o,dt){
   if(o.gnd||!o.spd) return;
@@ -518,7 +581,7 @@ async function loadCams(){
   rebuildCams();
   if(failed.length&&baseCams.length) toast("Could not load cameras from: "+failed.join(", ")+".");
   if(!cams.length) toast("Camera lists could not load. Check your connection and try again.");
-  loadWindy();
+  await loadWindy();
 }
 async function loadWindy(){
   if(!windyKey) return;
@@ -626,7 +689,7 @@ function nearCam(){
 let cityTileset=null;
 async function toggleLayer(id){
   layerOn[id]=!layerOn[id]; $("#chip-"+id).classList.toggle("on",layerOn[id]);
-  if(id==="flights"){ stores.flights.bb.show=layerOn.flights; if(layerOn.flights){ lastOpenSky=0; pollFlights(); } else setCount("flights",""); }
+  if(id==="flights"){ stores.flights.bb.show=layerOn.flights; if(layerOn.flights){ lastGlobal=0; pollFlights(); } else setCount("flights",""); }
   if(id==="mil"){ stores.mil.bb.show=layerOn.mil; if(layerOn.mil) pollMil(); else setCount("mil",""); }
   if(id==="sats"){ satPoints.show=layerOn.sats; if(layerOn.sats){ if(!sats.length) loadSats(); else tickSats(); } }
   if(id==="quakes"){ quakePts.show=layerOn.quakes; if(layerOn.quakes&&!quakes.length) loadQuakes(); }
@@ -790,7 +853,7 @@ $("#locate").addEventListener("click",()=>{
       toast(bd<=100000?"The nearest public camera is "+fmt(bd/1000)+" km from you.":"No public camera feeds within 100 km of you. Coverage is London, Austin, California and Finland."); },3300);
   },()=>toast("Location is blocked. Allow location access for this site, or search for a place instead."),{timeout:12000});
 });
-$("#gear").addEventListener("click",()=>{ $("#ionTok").value=ionToken; $("#windyTok").value=windyKey; $("#dlg").style.display="flex"; });
+$("#gear").addEventListener("click",()=>{ $("#ionTok").value=ionToken; $("#windyTok").value=windyKey; $("#aiTok").value=localStorage.getItem("eoe_ai")||""; $("#dlg").style.display="flex"; });
 $("#dlgClose").addEventListener("click",()=>$("#dlg").style.display="none");
 $("#ionSave").addEventListener("click",()=>{ const v=$("#ionTok").value.trim(); if(v) localStorage.setItem("eoe_ion",v); location.reload(); });
 $("#windySave").addEventListener("click",()=>{ const v=$("#windyTok").value.trim(); if(v){ localStorage.setItem("eoe_windy",v); localStorage.removeItem("eoe_windy_list2"); } location.reload(); });
@@ -819,29 +882,221 @@ window.addEventListener("keydown",e=>{
   if(e.key==="h"||e.key==="H"){ const h=$("#hud"); h.style.display=h.style.display==="none"?"flex":"none"; }
 });
 
+/* ---------- command bar ---------- */
+let camsReady=Promise.resolve();
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let msgTimer;
+function say(t){ const m=$("#cmdmsg"); m.textContent=t; m.style.display="block"; clearTimeout(msgTimer); msgTimer=setTimeout(()=>m.style.display="none",16000); }
+function fixSpacing(x){
+  return x.replace(/(uttar|madhya|andhra|arunachal|himachal)\s*pradesh/ig,"$1 pradesh").replace(/west\s*bengal/ig,"west bengal")
+    .replace(/tamil\s*nadu/ig,"tamil nadu").replace(/jammu\s*(?:and|&)?\s*kashmir/ig,"jammu and kashmir").replace(/new\s*delhi/ig,"new delhi");
+}
+async function nominatim(q){
+  const r=await getJSON("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q="+encodeURIComponent(q),15000);
+  return (r&&r[0])||null;
+}
+const shortName=l=>String(l).split(",").map(x=>x.trim()).slice(0,3).join(", ");
+async function geocodeParts(parts){
+  parts=parts.map(x=>fixSpacing(String(x).trim())).filter(Boolean); if(!parts.length) return null;
+  const pack=(r,n)=>({lat:+r.lat,lon:+r.lon,bb:r.boundingbox.map(Number),label:r.display_name,used:n,total:parts.length,matched:parts[n-1]});
+  for(let n=parts.length;n>=1;n--){
+    const sub=parts.slice(0,n); let r;
+    try{ r=await nominatim(sub.slice().reverse().join(", ")); }catch(e){ throw new Error("search"); }
+    if(r) return pack(r,n);
+    if(n===parts.length&&sub.length>1){
+      await sleep(1100);
+      try{ r=await nominatim(sub.join(", ")); }catch(e){ throw new Error("search"); }
+      if(r) return pack(r,n);
+    }
+    if(n>1) await sleep(1100);
+  }
+  return null;
+}
+function flyToPlace(g){
+  let [s0,n0,w0,e0]=g.bb; const pad=0.004;
+  if(n0-s0<pad){ s0-=pad/2; n0+=pad/2; } if(e0-w0<pad){ w0-=pad/2; e0+=pad/2; }
+  camera.flyTo({destination:CS.Rectangle.fromDegrees(w0,s0,e0,n0),duration:3.2});
+}
+const LAYER_WORDS=[["mil",/\b(military|mil)\b/],["flights",/\b(flights?|planes?|aircrafts?|airplanes?)\b/],["sats",/\bsatellites\b|\bsats?\b/],
+  ["quakes",/\b(earthquakes?|quakes?)\b/],["cams",/\b(cctv|cctvs|cameras?|cams|webcams?)\b/],["cities",/\b(3d cities|3d city|cities)\b/]];
+const layerOf=x=>{ for(const [id,re] of LAYER_WORDS) if(re.test(x)) return id; return null; };
+const LOOK_IDX={"normal":0,"night vision":1,"nvg":1,"thermal":2,"flir":2,"crt":3,"noir":4,"black and white":4};
+function placeParts(str){
+  str=str.trim().replace(/^the\s+/i,"");
+  if(str.includes(",")) return str.split(",").map(x=>x.trim()).filter(Boolean);
+  if(/\s+in\s+/i.test(str)) return str.split(/\s+in\s+/i).map(x=>x.trim()).filter(Boolean).reverse();
+  return [str];
+}
+function parseCommand(text){
+  const t=text.trim().replace(/[.!?]+$/,""), low=t.toLowerCase(); let m;
+  if(!t) return [];
+  if(/^(help|\?|commands|what can you do)$/.test(low)) return [{t:"help"}];
+  const chunks=t.split(/\s+(?:and then|then|and)\s+(?=(?:show|hide|turn|enable|disable|switch|track|follow|cctv|camera|go|fly|zoom|open|use|reset)\b)/i);
+  if(chunks.length>1) return chunks.flatMap(parseCommand);
+  if(/^(reset|home|world|whole world|zoom out|show earth|show the world)$/.test(low)) return [{t:"reset"}];
+  if(/^nearest\s+(cctv|cameras?|cams?)/.test(low)) return [{t:"nearcam"}];
+  if(/^cockpit/.test(low)) return [{t:"cockpit"}];
+  m=low.match(/^(?:access|show|open|get|see|view|watch|find|go to)?\s*(?:me\s+)?(?:the\s+|all\s+)?(?:cctv|cctvs|cameras?|cams?|webcams?)\s+(?:(?:of|at|on|near|in|around|for|from)\s+)?(.+)$/);
+  if(m&&!/^(layer|layers|on|off|view|feed)$/.test(m[1])) return [{t:"cctv",parts:placeParts(t.slice(t.length-m[1].length))}];
+  if(/^(?:access|open|show|get)\s+(?:the\s+)?(?:nearest\s+)?(?:cctv|cameras?)$/.test(low)&&/^(?:access|open|get)/.test(low)) return [{t:"cctv",parts:[]}];
+  m=low.match(/^(?:hide|turn off|disable|switch off|remove|stop showing)\s+(?:the\s+|all\s+)?(.+?)(?:\s+layer)?$/);
+  if(m){ const id=layerOf(m[1]); if(id) return [{t:"layer",name:id,on:false}]; }
+  m=low.match(/^(?:show|turn on|enable|switch on|display|add)\s+(?:me\s+)?(?:the\s+|all\s+)?(.+?)(?:\s+layer)?$/);
+  if(m&&!/\b(of|in|at|near|over)\b/.test(m[1])){ const id=layerOf(m[1]); if(id) return [{t:"layer",name:id,on:true}]; }
+  m=low.match(/^(?:switch to|use|set|turn on|enable|show|activate|change to|go)?\s*(?:the\s+)?(night vision|nvg|thermal|flir|crt|noir|black and white|normal)(?:\s+(?:mode|look|view|vision))?$/);
+  if(m) return [{t:"look",i:LOOK_IDX[m[1]]}];
+  m=low.match(/^(?:switch to|use|set|show|change to|enable)?\s*(?:the\s+)?(satellite (?:view|map|imagery)|hybrid|streets?(?: map| view)?|google maps?|road map|dark(?: map| mode)?)$/);
+  if(m){ const w=m[1]; return [{t:"base",name:/satellite|hybrid/.test(w)?"hybrid":/dark/.test(w)?"dark":"streets"}]; }
+  m=low.match(/^(track|follow|find|locate)\s+(?:flight\s+|plane\s+|aircraft\s+)?(.+)$/);
+  if(m&&(m[1]==="track"||m[1]==="follow"||/^[a-z]{2,3}\s?\d{1,4}[a-z]?$/.test(m[2])||/^iss$/.test(m[2])||/^[a-z0-9]{6}$/.test(m[2]))) return [{t:"follow",q:t.slice(t.length-m[2].length),verb:m[1]}];
+  m=low.match(/^(?:go to|goto|fly to|take me to|navigate to|zoom to|open|show me|show|search for|search|find|locate|where is)\s+(.+)$/);
+  if(m) return [{t:"goto",parts:placeParts(t.slice(t.length-m[1].length))}];
+  return [{t:"goto",parts:placeParts(t)}];
+}
+async function doGoto(parts){
+  const g=await geocodeParts(parts);
+  if(!g) return "I couldn't find \""+parts.join(", ")+"\". Check the spelling, or try fewer details.";
+  deselect(); flyToPlace(g);
+  if(g.used<g.total) return "I couldn't find \""+parts.slice(g.used).join(", ")+"\", so I went to "+shortName(g.label)+" instead.";
+  return "Flying to "+shortName(g.label)+".";
+}
+async function doCctv(parts){
+  await camsReady;
+  if(!cams.length) return "Camera lists are not loaded yet. Check your connection and try again.";
+  if(!layerOn.cams) await toggleLayer("cams");
+  let g=null, center;
+  if(parts&&parts.length){ g=await geocodeParts(parts); if(!g) return "I couldn't find \""+parts.join(", ")+"\"."; center=CS.Cartesian3.fromDegrees(g.lon,g.lat,5); }
+  else { const c=viewCenter(); center=CS.Cartesian3.fromDegrees(c.lon,c.lat,5); }
+  const norm=x=>String(x).toLowerCase().replace(/\bstreet\b/g,"st").replace(/\broad\b/g,"rd").replace(/\bavenue\b/g,"ave").replace(/[^a-z0-9 ]/g," ");
+  let best=-1, bd=Infinity;
+  if(g){
+    const skip=["rd","st","ave","the","of","nh","highway","junction","chowk","cross","road","street"];
+    const toks=norm(g.matched).split(/\s+/).filter(w=>w.length>1&&!skip.includes(w));
+    if(toks.length) cams.forEach((c,i)=>{ const d=CS.Cartesian3.distance(center,c.pos); if(d<60000&&d<bd&&toks.every(w=>norm(c.name).includes(w))){ bd=d; best=i; } });
+  }
+  if(best<0){ bd=Infinity; cams.forEach((c,i)=>{ const d=CS.Cartesian3.distance(center,c.pos); if(d<bd){ bd=d; best=i; } }); if(bd>30000) best=-1; }
+  const where=g?shortName(g.label):"the current view";
+  if(best<0){ if(g){ deselect(); flyToPlace(g); } return "No public camera within 30 km of "+where+". Cameras exist in London, Austin, California, Finland, India (with a Windy key) and any you add with + Add camera."; }
+  select({kind:"cam",key:best}); startTrack();
+  return "Opened camera \""+cams[best].name+"\", "+fmt(bd/1000,1)+" km from "+where+".";
+}
+async function doFollow(a){
+  const q=a.q.trim().toLowerCase().replace(/\s+/g,"");
+  if(/^(iss|internationalspacestation)$/.test(q)){
+    const i=sats.findIndex(x=>/ISS \(ZARYA\)/.test(x.name)); if(i<0) return "The satellite list hasn't loaded yet.";
+    if(!layerOn.sats) await toggleLayer("sats"); select({kind:"sat",key:i}); startTrack(); return "Following the International Space Station.";
+  }
+  let hit=null;
+  for(const st of [stores.flights,stores.mil]) for(const [k,o] of st.map){
+    if((o.call||"").toLowerCase().replace(/\s+/g,"")===q||(o.reg||"").toLowerCase()===q||k.toLowerCase()===q) hit={kind:st.kind,key:k};
+  }
+  if(!hit){ const i=sats.findIndex(x=>x.name.toLowerCase().replace(/\s+/g,"").includes(q)); if(i>=0) hit={kind:"sat",key:i}; }
+  if(!hit){
+    if(a.verb==="find"||a.verb==="locate") return doGoto(placeParts(a.q));
+    return "I couldn't find \""+a.q+"\" among the aircraft and satellites loaded. Planes only load near where you're looking.";
+  }
+  const ho=getObj(hit); select(hit); startTrack(); return "Following "+((ho&&(ho.call||ho.name))||a.q)+".";
+}
+async function runAction(a){
+  switch(a.t){
+    case "help": return "Try: go to India, Uttar Pradesh, Azamgarh · cctv of Oxford Street, London · show satellites · hide flights · follow ISS · night vision · streets · reset";
+    case "reset": deselect(); camera.flyTo({destination:CS.Cartesian3.fromDegrees(78,20,2.3e7),duration:2.5}); return "Back to the whole Earth.";
+    case "layer": {
+      if(!(a.name in layerOn)) return "That layer isn't available. 3D cities needs a Cesium ion token in Settings.";
+      if(layerOn[a.name]!==a.on) await toggleLayer(a.name);
+      return (a.on?"Showing ":"Hid ")+LAYERS.find(l=>l.id===a.name).label.toLowerCase()+".";
+    }
+    case "look": if(a.i==null) return ""; setStyle(a.i); return "Sensor look: "+STYLES[a.i].k+".";
+    case "base": setBase(a.name); return "Map style: "+(a.name==="hybrid"?"satellite with borders and labels":a.name)+".";
+    case "goto": return await doGoto(a.parts||[]);
+    case "cctv": return await doCctv(a.parts||[]);
+    case "nearcam": {
+      await camsReady; const o=getObj(sel); let pos=o&&o.pos; if(!pos){ const c=viewCenter(); pos=CS.Cartesian3.fromDegrees(c.lon,c.lat,5); }
+      const i=nearestCam({pos},60); if(i<0) return "No public camera within 60 km."; if(!layerOn.cams) await toggleLayer("cams");
+      select({kind:"cam",key:i}); startTrack(); return "Opened the nearest camera: "+cams[i].name+".";
+    }
+    case "follow": return await doFollow(a);
+    case "cockpit": if(sel&&(sel.kind==="flights"||sel.kind==="mil")){ startCockpit(); return "Cockpit view. Tap Leave cockpit to exit."; } return "Select a plane first, then say cockpit.";
+  }
+  return "";
+}
+function normAI(a){
+  if(!a||typeof a!=="object") return null;
+  if(a.t==="goto"||a.t==="cctv") return {t:a.t,parts:Array.isArray(a.parts)?a.parts.map(String):(a.q?placeParts(String(a.q)):[])};
+  if(a.t==="layer"&&["flights","mil","sats","quakes","cams"].includes(a.name)) return {t:"layer",name:a.name,on:a.on!==false};
+  if(a.t==="look"){ const i={normal:0,night:1,thermal:2,crt:3,noir:4}[a.name]; return i==null?null:{t:"look",i}; }
+  if(a.t==="base"&&BASES[a.name]) return {t:"base",name:a.name};
+  if(a.t==="follow"&&a.q) return {t:"follow",q:String(a.q),verb:"follow"};
+  if(a.t==="reset"||a.t==="help") return {t:a.t};
+  return null;
+}
+async function askAI(text,key){
+  const system='You turn commands for a 3D Earth app into JSON. Reply with JSON only, no prose: {"actions":[...]}. Action shapes: {"t":"goto","parts":["country","state","city","road"]} (general to specific, only the parts the user gave); {"t":"cctv","parts":[...]} (open the nearest public camera to that place; parts may be empty for the current view); {"t":"layer","name":"flights|mil|sats|quakes|cams","on":true}; {"t":"look","name":"normal|night|thermal|crt|noir"}; {"t":"base","name":"hybrid|streets|dark"}; {"t":"follow","q":"ISS or a flight callsign"}; {"t":"reset"}; {"t":"help"}.';
+  const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",
+    headers:{"content-type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:"claude-haiku-5-5",max_tokens:500,system,messages:[{role:"user",content:text}]})});
+  if(!r.ok) throw new Error("ai "+r.status);
+  const j=await r.json(); const txt=(j.content||[]).map(c=>c.text||"").join("").replace(/```json|```/g,"").trim();
+  return (JSON.parse(txt).actions||[]).map(normAI).filter(Boolean);
+}
+async function handleCommand(text){
+  say("Working on it...");
+  try{
+    let actions=parseCommand(text);
+    const key=(localStorage.getItem("eoe_ai")||"").trim(), words=text.trim().split(/\s+/).length;
+    if(key&&words>=5&&!text.includes(",")&&actions.length===1&&actions[0].t==="goto"){
+      const ai=await askAI(text,key).catch(e=>{ console.warn("ai",e); return null; }); if(ai&&ai.length) actions=ai;
+    }
+    const out=[]; for(const a of actions){ const r=await runAction(a); if(r) out.push(r); }
+    say(out.join(" ")||"Done.");
+  }catch(e){
+    console.warn(e);
+    say(e&&e.message==="search"?"Place search is not responding. Check your internet connection and try again.":"Something went wrong running that command. Try rephrasing it.");
+  }
+}
+$("#cmdform").addEventListener("submit",e=>{
+  e.preventDefault(); const v=$("#cmdin").value.trim(); if(!v) return; $("#cmdin").blur(); $("#cmdin").value=""; handleCommand(v);
+});
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(SR){
+  $("#mic").style.display="block";
+  $("#mic").addEventListener("click",()=>{
+    try{
+      const r=new SR(); r.lang="en-IN"; r.interimResults=false;
+      r.onresult=e=>{ const v=e.results[0][0].transcript; $("#cmdin").value=""; handleCommand(v); };
+      r.onerror=()=>say("I couldn't hear that. Allow microphone access for this site and try again.");
+      r.start(); say("Listening...");
+    }catch(err){ say("Voice input isn't available in this browser."); }
+  });
+}
+$("#aiSave").addEventListener("click",()=>{ const v=$("#aiTok").value.trim(); if(v){ localStorage.setItem("eoe_ai",v); toast("AI key saved."); } $("#dlg").style.display="none"; });
+$("#aiClear").addEventListener("click",()=>{ localStorage.removeItem("eoe_ai"); $("#aiTok").value=""; toast("AI key removed."); });
+
 /* ---------- HUD + timers ---------- */
 function updateHud(){
   const c=viewCenter(), h=camera.positionCartographic.height;
   const alt=h>=1e6?fmt(h/1000)+" km":h>=1000?fmt(h/1000,1)+" km":fmt(h)+" m";
   $("#hud").innerHTML="<span>View <b>"+c.lat.toFixed(2)+", "+c.lon.toFixed(2)+"</b></span><span>Camera <b>"+alt+"</b></span><span>UTC <b>"+new Date().toISOString().slice(11,19)+"</b></span>";
 }
-setInterval(updateHud,500);
+setInterval(updateHud,1000);
 let tickN=0;
 setInterval(()=>{
-  const dt=1;
+  const dt=2;
   if(layerOn.flights) stores.flights.map.forEach(o=>advance(o,dt));
   if(layerOn.mil) stores.mil.map.forEach(o=>advance(o,dt));
   tickSats();
   tickN++;
   if(sel&&sel.kind!=="quake"&&sel.kind!=="cam") renderCard();
-},1000);
+},2000);
 setInterval(()=>{ if(sel&&sel.kind==="sat") drawOrbit(getObj(sel)); },8000);
-setInterval(pollFlights,12000);
+setInterval(pollFlights,15000);
 setInterval(pollMil,20000);
 setInterval(loadQuakes,300000);
-let moveT; camera.moveEnd.addEventListener(()=>{ clearTimeout(moveT); moveT=setTimeout(()=>{ if(camera.positionCartographic.height<=2.5e6) pollFlights(); },900); });
+let moveT; camera.moveEnd.addEventListener(()=>{ clearTimeout(moveT); moveT=setTimeout(()=>{ if(camera.positionCartographic.height<=3e6) pollFlights(); },1200); });
+camera.percentageChanged=0.15;
+camera.changed.addEventListener(()=>{ camPts.show=layerOn.cams&&camera.positionCartographic.height<1.2e7; });
 
-pollFlights(); loadSats(); loadQuakes(); loadCams(); updateHud();
+pollFlights(); loadSats(); loadQuakes(); camsReady=loadCams(); updateHud();
 })();
 </script>
 </body>
