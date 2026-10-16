@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1219">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Eye on Earth: live globe</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Widgets/widgets.css">
+<style>
+  :root{
+    --bg:#0b1219; --panel:rgba(14,22,32,.82); --line:rgba(150,185,215,.22);
+    --ink:#e3ebf2; --dim:#8da2b5; --sky:#6fb8ff; --amber:#ffb547; --coral:#ff6b5e; --plane:#f2f5f7;
+    --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+  #globe{position:fixed;inset:0}
+  .cesium-viewer-bottom{display:block}
+  .cesium-widget-credits{font-size:10px}
+  .panel{background:var(--panel);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:14px}
+  button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-action:manipulation}
+  .num{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+
+  #hdr{position:fixed;left:10px;right:10px;top:calc(10px + var(--safe-t));z-index:5;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+  #hdr>*,#top>*{pointer-events:auto}
+  #hdr>#top{pointer-events:none;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  #brand{padding:10px 14px;font-weight:650;letter-spacing:.01em;display:flex;align-items:center;gap:8px}
+  #brand i{width:9px;height:9px;border-radius:50%;background:var(--coral);box-shadow:0 0 0 0 rgba(255,107,94,.7);animation:pulse 2s infinite}
+  @keyframes pulse{70%{box-shadow:0 0 0 9px rgba(255,107,94,0)}100%{box-shadow:0 0 0 0 rgba(255,107,94,0)}}
+  @media (prefers-reduced-motion:reduce){#brand i{animation:none}}
+  #search{flex:1 1 220px;min-width:180px;display:flex;overflow:hidden}
+  #search input{flex:1;min-width:0;background:none;border:0;color:var(--ink);font:inherit;padding:11px 14px;outline:0}
+  #search input::placeholder{color:var(--dim)}
+  #search button{padding:0 14px;color:var(--sky);font-weight:600}
+  .tbtn{padding:10px 14px;min-height:42px}
+  .tbtn:focus-visible,#search button:focus-visible,.chip:focus-visible,.sty:focus-visible,.act:focus-visible{outline:2px solid var(--sky);outline-offset:2px}
+
+  #layers{align-self:flex-start;padding:6px;min-width:184px;max-height:calc(100vh - 260px);overflow:auto}
+  #chips{display:flex;flex-direction:column;gap:2px}
+  #layers.collapsed #chips{display:none}
+  .lhead{display:flex;justify-content:space-between;align-items:center;width:100%;padding:8px 10px;min-height:38px;font-size:12px;font-weight:600;color:var(--dim)}
+  #camJump{padding:4px 8px 6px;display:flex;flex-wrap:wrap;gap:6px}
+  #camJump span{width:100%;color:var(--dim);font-size:11.5px}
+  .mini{padding:7px 11px;border:1px solid var(--line);border-radius:999px;font-size:12.5px;min-height:36px}
+  #styles h2{margin:4px 8px 2px;font-size:11px;font-weight:600;color:var(--dim);letter-spacing:.02em}
+  .chip{display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:10px;min-height:44px;text-align:left;width:100%}
+  .chip .dot{width:11px;height:11px;border-radius:50%;border:2px solid var(--c);flex:none}
+  .chip.on .dot{background:var(--c)}
+  .chip .lbl{flex:1}
+  .chip .cnt{font-size:12px;color:var(--dim)}
+  .chip.err .cnt{color:var(--coral)}
+  .chip.on{background:rgba(120,170,220,.12)}
+
+  #styles{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(64px + var(--safe-b));z-index:5;padding:6px 8px;max-width:calc(100vw - 20px)}
+  #styles .row{display:flex;gap:4px;overflow-x:auto}
+  .sty{padding:9px 13px;border-radius:10px;white-space:nowrap;min-height:40px;color:var(--dim)}
+  .sty.on{background:var(--ink);color:#0b1219;font-weight:600}
+
+  #card{position:fixed;right:10px;top:calc(68px + var(--safe-t));width:290px;max-height:calc(100vh - 190px);overflow:auto;z-index:6;padding:14px;display:none}
+  #card h3{margin:0 0 2px;font-size:18px}
+  #card .sub{color:var(--dim);margin-bottom:10px;font-size:12.5px}
+  #card dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:5px 14px}
+  #card dt{color:var(--dim)} #card dd{margin:0;text-align:right}
+  #card .acts{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .act{flex:1;padding:11px 10px;border-radius:10px;border:1px solid var(--line);text-align:center;min-height:44px;font-weight:600}
+  .act.pri{background:var(--sky);color:#06121d;border-color:transparent}
+  #card img.cam,#card video.cam{width:100%;border-radius:10px;display:block;background:#000;min-height:110px;object-fit:cover}
+  #card .camoff{padding:26px 12px;text-align:center;color:var(--dim);background:rgba(0,0,0,.3);border-radius:10px;font-size:13px}
+  .camwrap{margin-bottom:10px}
+  #lightbox{position:fixed;inset:0;z-index:30;background:rgba(5,9,14,.92);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:12px}
+  #lightbox img{max-width:96vw;max-height:80vh;border-radius:8px}
+  @media (max-width:900px){
+    #card{left:10px;right:10px;width:auto;top:auto;bottom:calc(150px + var(--safe-b));max-height:42vh}
+  }
+  @media (max-width:700px){
+    #search{flex-basis:100%;order:5}
+    .tbtn{padding:8px 12px;min-height:40px}
+    #hud{display:none}
+    #styles{bottom:calc(34px + var(--safe-b))}
+    #card{bottom:calc(122px + var(--safe-b))}
+    #exitCockpit{bottom:calc(110px + var(--safe-b))}
+    #layers{max-height:calc(100vh - 340px)}
+  }
+  @media (max-width:480px){ #brand{display:none} }
+  @media (max-height:520px){
+    #hud{display:none}
+    #styles{bottom:calc(30px + var(--safe-b))}
+    #card{max-height:56vh;bottom:calc(100px + var(--safe-b))}
+    #layers{max-height:calc(100vh - 150px)}
+  }
+
+  #hud{position:fixed;left:10px;bottom:calc(30px + var(--safe-b));z-index:4;padding:7px 12px;font-size:12px;color:var(--dim);display:flex;gap:14px;flex-wrap:wrap;max-width:calc(100vw - 20px)}
+  #hud b{color:var(--ink);font-weight:500}
+  #toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(64px + var(--safe-t));z-index:9;padding:9px 14px;display:none;max-width:90vw}
+  #exitCockpit{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(130px + var(--safe-b));z-index:7;padding:12px 20px;display:none;font-weight:600}
+  #reticle{position:fixed;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border:1.5px solid rgba(255,255,255,.55);border-radius:50%;z-index:3;pointer-events:none;display:none}
+  #reticle:before,#reticle:after{content:"";position:absolute;background:rgba(255,255,255,.55)}
+  #reticle:before{left:50%;top:-9px;width:1.5px;height:64px;margin-left:-.75px}
+  #reticle:after{top:50%;left:-9px;height:1.5px;width:64px;margin-top:-.75px}
+  #crt{position:fixed;inset:0;pointer-events:none;z-index:2;display:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.22) 0 1px,transparent 1px 3px);box-shadow:inset 0 0 140px rgba(0,0,0,.65)}
+
+  .dlg{position:fixed;inset:0;z-index:20;background:rgba(5,9,14,.7);display:none;align-items:center;justify-content:center;padding:16px}
+  .dlg .box{max-width:460px;width:100%;padding:18px;max-height:90vh;overflow:auto}
+  .dlg h3{margin:0 0 8px} .dlg p{margin:8px 0;color:var(--dim);font-size:13px}
+  .dlg input{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:rgba(0,0,0,.25);color:var(--ink);font:inherit}
+  .dlg a{color:var(--sky)}
+  .acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .dlg input+input{margin-top:8px}
+  .dlg .two{display:flex;gap:8px;margin-top:8px}
+  .dlg .two input{margin-top:0}
+  #card canvas.cam{width:100%;border-radius:10px;display:block;background:#000}
+  #card iframe.cam{width:100%;aspect-ratio:16/9;border:0;border-radius:10px;background:#000;display:block}
+  .replay{display:none;align-items:center;gap:8px;margin:-4px 0 10px}
+  .replay input{flex:1;min-width:0}
+  #camattr{font-size:12px;color:var(--dim);margin:0 0 10px}
+  #camattr a{color:var(--sky)}
+</style>
+</head>
+<body>
+<div id="globe"></div>
+<div id="crt"></div>
+<div id="reticle"></div>
+
+<div id="hdr">
+<div id="top">
+  <div id="brand" class="panel"><i></i>Eye on Earth</div>
+  <form id="search" class="panel" autocomplete="off">
+    <input id="q" type="search" placeholder="City, landmark, or lat, lon" aria-label="Search a place">
+    <button type="submit">Go</button>
+  </form>
+  <button id="reset" class="panel tbtn">Reset globe</button>
+  <button id="locate" class="panel tbtn">Near me</button>
+  <button id="gear" class="panel tbtn" aria-label="Settings and sources">Settings</button>
+</div>
+<div id="layers" class="panel"><button id="layersHead" class="lhead" aria-expanded="true"><span>Layers</span><span id="lhint">hide</span></button><div id="chips"></div></div>
+</div>
+
+<div id="card" class="panel"></div>
+<div id="toast" class="panel"></div>
+<div id="lightbox"><img id="lbimg" alt="Enlarged camera view"><button class="act panel" style="flex:none;padding:12px 28px">Close</button></div>
+<button id="exitCockpit" class="panel">Leave cockpit</button>
+
+<div id="styles" class="panel">
+  <h2>Sensor look</h2>
+  <div class="row" id="styleRow"></div>
+</div>
+
+<div id="hud" class="panel num"></div>
+
+<div id="dlg" class="dlg">
+  <div class="box panel">
+    <h3>Settings and sources</h3>
+    <p><b style="color:var(--ink)">Photorealistic 3D cities (optional).</b> Paste a free <a href="https://cesium.com/ion/tokens" target="_blank" rel="noopener">Cesium ion token</a> to unlock world terrain and Google 3D city tiles. The token stays in this browser only.</p>
+    <input id="ionTok" placeholder="Cesium ion access token" autocomplete="off">
+    <div class="acts" style="display:flex;gap:8px;margin-top:10px">
+      <button class="act pri" id="ionSave">Save and reload</button>
+      <button class="act" id="ionClear">Remove token</button>
+    </div>
+    <p style="margin-top:16px"><b style="color:var(--ink)">India cameras (Windy).</b> A free key from <a href="https://api.windy.com/keys" target="_blank" rel="noopener">api.windy.com/keys</a> adds webcams across India (city, tourist and weather cameras). Their free plan shows a new photo every 5 to 15 minutes, has daily limits, and needs a credit to windy.com, which the app shows. The key stays in this browser.</p>
+    <input id="windyTok" placeholder="Windy Webcams API key" autocomplete="off">
+    <div class="acts"><button class="act pri" id="windySave">Save and reload</button><button class="act" id="windyClear">Remove key</button></div>
+    <p style="margin-top:16px"><b style="color:var(--ink)">Public cameras.</b> Live stills from Transport for London (London), the City of Austin, Caltrans (California) and Fintraffic Digitraffic (Finland). The pictures belong to those operators and load straight from their servers. Cameras in other places are not available yet.</p>
+    <p><b style="color:var(--ink)">Other sources.</b> Flights: adsb.lol and OpenSky Network. Satellites: CelesTrak (orbits computed with satellite.js). Earthquakes: USGS. Imagery: Esri World Imagery. Search: OpenStreetMap Nominatim. Globe: CesiumJS.</p>
+    <p>Data can be delayed, partial or wrong. Do not use this for navigation, emergencies or any safety decision.</p>
+    <div class="acts" style="display:flex;margin-top:10px"><button class="act" id="dlgClose">Close</button></div>
+  </div>
+</div>
+
+<div id="dlg2" class="dlg">
+  <div class="box panel">
+    <h3>Add a camera</h3>
+    <p>Paste a public link: a YouTube live page, an .m3u8 live stream, an .mp4 video, or a camera photo link. It must start with https. YouTube and .m3u8 links give smooth live video.</p>
+    <input id="mcName" placeholder="Name, for example Haridwar Ganga ghat" autocomplete="off">
+    <input id="mcLink" placeholder="https://..." autocomplete="off" inputmode="url">
+    <div class="two"><input id="mcLat" placeholder="Latitude" inputmode="decimal"><input id="mcLon" placeholder="Longitude" inputmode="decimal"></div>
+    <div class="acts"><button class="act" id="mcCenter">Use the map center as location</button></div>
+    <div class="acts"><button class="act pri" id="mcSave">Save camera</button><button class="act" id="mcClose">Cancel</button></div>
+    <p>Saved only in this browser. Add only cameras whose owners make them public.</p>
+  </div>
+</div>
+
+<script>window.CESIUM_BASE_URL="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/";</script>
+<script src="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Cesium.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+<script>
+(function(){
+"use strict";
+const CS = Cesium;
+const $ = s => document.querySelector(s);
+
+/* ---------- setup ---------- */
+const ionToken = localStorage.getItem("eoe_ion") || "";
+if (ionToken) CS.Ion.defaultAccessToken = ionToken;
+
+const esri = new CS.UrlTemplateImageryProvider({
+  url: "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  maximumLevel: 19,
+  credit: "Imagery © Esri, Maxar, Earthstar Geographics"
+});
+
+const small = window.matchMedia("(max-width:700px)").matches;
+const viewer = new CS.Viewer("globe", {
+  baseLayer: new CS.ImageryLayer(esri),
+  baseLayerPicker:false, geocoder:false, homeButton:false, sceneModePicker:false,
+  navigationHelpButton:false, fullscreenButton:false, animation:false, timeline:false,
+  infoBox:false, selectionIndicator:false, msaaSamples:small?1:2
+});
+viewer.useBrowserRecommendedResolution=false;
+viewer.resolutionScale=Math.min(window.devicePixelRatio||1, small?1.5:2);
+const scene = viewer.scene, camera = viewer.camera;
+scene.globe.enableLighting = false;
+scene.highDynamicRange = false;
+scene.skyAtmosphere.show = true;
+if (ionToken) { try { scene.setTerrain(CS.Terrain.fromWorldTerrain()); } catch(e){ console.warn(e); } }
+camera.setView({ destination: CS.Cartesian3.fromDegrees(78, 20, 2.3e7) });
+
+/* ---------- helpers ---------- */
+const deg = CS.Math.toDegrees, rad = CS.Math.toRadians;
+async function getJSON(url, ms=14000, headers){
+  const c=new AbortController(), t=setTimeout(()=>c.abort(),ms);
+  try{ const r=await fetch(url,{signal:c.signal,headers}); if(!r.ok) throw new Error("HTTP "+r.status); return await r.json(); }
+  finally{ clearTimeout(t); }
+}
+async function getText(url, ms=20000){
+  const c=new AbortController(), t=setTimeout(()=>c.abort(),ms);
+  try{ const r=await fetch(url,{signal:c.signal}); if(!r.ok) throw new Error("HTTP "+r.status); return await r.text(); }
+  finally{ clearTimeout(t); }
+}
+let toastTimer;
+function toast(msg){ const t=$("#toast"); t.textContent=msg; t.style.display="block"; clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.style.display="none",3800); }
+function viewCenter(){
+  const r = camera.pickEllipsoid(new CS.Cartesian2(viewer.canvas.clientWidth/2, viewer.canvas.clientHeight/2));
+  const c = r ? CS.Cartographic.fromCartesian(r) : camera.positionCartographic;
+  return { lat: deg(c.latitude), lon: deg(c.longitude) };
+}
+const fmt = (n,d=0) => (n==null||isNaN(n)) ? "n/a" : Number(n).toLocaleString("en-US",{maximumFractionDigits:d});
+
+/* ---------- layer state + UI ---------- */
+const LAYERS = [
+  {id:"flights", label:"Flights",    color:"#f2f5f7", on:true},
+  {id:"mil",     label:"Military",   color:"#ffb547", on:false},
+  {id:"sats",    label:"Satellites", color:"#6fb8ff", on:true},
+  {id:"quakes",  label:"Earthquakes",color:"#ff6b5e", on:true},
+  {id:"cams",    label:"Public cameras",color:"#c58bff", on:true}
+];
+if (ionToken) LAYERS.push({id:"cities", label:"3D cities", color:"#9be37a", on:false});
+const layerOn = {};
+LAYERS.forEach(l=>{
+  layerOn[l.id]=l.on;
+  const b=document.createElement("button");
+  b.className="chip"+(l.on?" on":""); b.id="chip-"+l.id; b.style.setProperty("--c",l.color);
+  b.innerHTML='<span class="dot"></span><span class="lbl">'+l.label+'</span><span class="cnt num"></span>';
+  b.addEventListener("click",()=>toggleLayer(l.id));
+  $("#chips").appendChild(b);
+});
+function setCount(id, text, err){ const c=$("#chip-"+id); if(!c) return; c.querySelector(".cnt").textContent=text; c.classList.toggle("err",!!err); }
+const JUMPS=[["London",51.507,-0.127,70000],["Austin",30.27,-97.74,60000],["California",34.05,-118.24,160000],["Finland",60.17,24.94,120000],["India",22.6,79.0,4500000]];
+const jumpBox=document.createElement("div"); jumpBox.id="camJump";
+jumpBox.innerHTML="<span>Jump to cameras</span>"+JUMPS.map((j,i)=>'<button class="mini" data-j="'+i+'">'+j[0]+'</button>').join("")+'<button class="mini" data-roads="1" id="roadsBtn">Roads only: off</button><button class="mini" data-add="1">+ Add camera</button>';
+$("#chips").appendChild(jumpBox);
+jumpBox.addEventListener("click",e=>{
+  const b=e.target.closest("[data-j],[data-add],[data-roads]"); if(!b) return;
+  if(b.dataset.roads){ roadsOnly=!roadsOnly; b.textContent="Roads only: "+(roadsOnly?"on":"off"); rebuildCams(); const n=windyCams.filter(c=>c.road).length; toast(roadsOnly?(windyKey?n+" road cameras found in India (Windy).":"Roads only hides non-road Windy cameras once you add a Windy key."):"Showing all cameras."); return; }
+  if(b.dataset.add){ $("#dlg2").style.display="flex"; return; }
+  const j=JUMPS[+b.dataset.j]; deselect(); camera.flyTo({destination:CS.Cartesian3.fromDegrees(j[2],j[1],j[3]),duration:3});
+  if(j[0]==="India"&&!windyKey&&!myCams.length){ toast("India cameras come from Windy. Add a free key in Settings, or add your own camera."); setTimeout(()=>$("#gear").click(),1200); }
+});
+$("#layersHead").addEventListener("click",()=>{ const l=$("#layers"); const c=l.classList.toggle("collapsed"); $("#lhint").textContent=c?"show":"hide"; $("#layersHead").setAttribute("aria-expanded",String(!c)); });
+if(small){ $("#layers").classList.add("collapsed"); $("#lhint").textContent="show"; $("#layersHead").setAttribute("aria-expanded","false"); }
+
+/* ---------- aircraft ---------- */
+function makeIcon(){
+  const c=document.createElement("canvas"); c.width=c.height=64; const x=c.getContext("2d");
+  x.fillStyle="#fff"; x.strokeStyle="rgba(0,0,0,.65)"; x.lineWidth=2.5; x.beginPath();
+  [[32,3],[37,24],[60,38],[60,45],[37,39],[35,54],[43,58],[43,62],[32,60],[21,62],[21,58],[29,54],[27,39],[4,45],[4,38],[27,24]]
+    .forEach((p,i)=>i?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1]));
+  x.closePath(); x.stroke(); x.fill(); return c.toDataURL();
+}
+const PLANE = makeIcon();
+const stores = {
+  flights:{ kind:"flights", map:new Map(), bb:scene.primitives.add(new CS.BillboardCollection()), color:CS.Color.fromCssColorString("#f2f5f7") },
+  mil:    { kind:"mil",     map:new Map(), bb:scene.primitives.add(new CS.BillboardCollection()), color:CS.Color.fromCssColorString("#ffb547") }
+};
+stores.mil.bb.show=false;
+
+function upsert(store, list){
+  const seen=new Set();
+  for(const f of list){
+    if(f.lat==null||f.lon==null||!f.key) continue;
+    seen.add(f.key);
+    const pos=CS.Cartesian3.fromDegrees(f.lon,f.lat,f.alt||0);
+    let o=store.map.get(f.key);
+    if(!o){
+      const bb=store.bb.add({
+        position:pos, image:PLANE, scale:0.42, rotation:-rad(f.trk||0), color:store.color,
+        id:{kind:store.kind,key:f.key}, scaleByDistance:new CS.NearFarScalar(2e3,1.1,2.5e7,0.3)
+      });
+      o=Object.assign({},f,{bb}); store.map.set(f.key,o);
+    } else {
+      Object.assign(o,f); o.bb.position=pos; o.bb.rotation=-rad(f.trk||0);
+    }
+    o.pos=pos;
+    o.bb.color = f.gnd ? store.color.withAlpha(.45) : store.color;
+  }
+  for(const [k,o] of store.map){ if(!seen.has(k)){ store.bb.remove(o.bb); store.map.delete(k); } }
+}
+function parseAdsb(j, forceMil){
+  return (j.ac||[]).map(a=>({
+    key:a.hex, lat:a.lat, lon:a.lon,
+    alt:(typeof a.alt_baro==="number")?a.alt_baro*0.3048:0,
+    gnd:a.alt_baro==="ground",
+    spd:(a.gs||0)*0.5144, trk:(a.track!=null?a.track:(a.true_heading||0)),
+    call:(a.flight||"").trim()||a.r||a.hex, type:a.t||"", reg:a.r||"",
+    mil:!!forceMil||((a.dbFlags||0)&1)===1, src:"adsb.lol"
+  }));
+}
+function parseOpenSky(j){
+  const st=j.states||[]; const step=Math.max(1,Math.ceil(st.length/5000)); const out=[];
+  for(let i=0;i<st.length;i+=step){
+    const s=st[i]; if(s[5]==null||s[6]==null) continue;
+    out.push({key:s[0],lat:s[6],lon:s[5],alt:(s[13]!=null?s[13]:(s[7]||0)),gnd:!!s[8],spd:s[9]||0,trk:s[10]||0,
+      call:(s[1]||"").trim()||s[0],type:"",reg:"",mil:false,src:"OpenSky ("+s[2]+")"});
+  }
+  return out;
+}
+let lastOpenSky=0;
+async function pollFlights(){
+  if(!layerOn.flights) return;
+  const h=camera.positionCartographic.height;
+  try{
+    if(h>2.5e6){
+      if(Date.now()-lastOpenSky<60000) return;
+      lastOpenSky=Date.now();
+      const j=await getJSON("https://opensky-network.org/api/states/all",25000);
+      upsert(stores.flights, parseOpenSky(j));
+    } else {
+      const c=viewCenter(); const nm=Math.round(Math.min(250,Math.max(30,h/1852*0.7)));
+      let list;
+      try{
+        const j=await getJSON("https://api.adsb.lol/v2/point/"+c.lat.toFixed(3)+"/"+c.lon.toFixed(3)+"/"+nm);
+        list=parseAdsb(j,false).filter(a=>!a.mil);
+      }catch(e1){
+        const d=nm/60, q="lamin="+(c.lat-d).toFixed(2)+"&lamax="+(c.lat+d).toFixed(2)+"&lomin="+(c.lon-d*1.3).toFixed(2)+"&lomax="+(c.lon+d*1.3).toFixed(2);
+        list=parseOpenSky(await getJSON("https://opensky-network.org/api/states/all?"+q));
+      }
+      upsert(stores.flights,list);
+    }
+    setCount("flights",fmt(stores.flights.map.size));
+  }catch(e){ console.warn("flights",e); setCount("flights","no data",true); }
+}
+async function pollMil(){
+  if(!layerOn.mil) return;
+  try{
+    const j=await getJSON("https://api.adsb.lol/v2/mil");
+    upsert(stores.mil,parseAdsb(j,true));
+    setCount("mil",fmt(stores.mil.map.size));
+  }catch(e){ console.warn("mil",e); setCount("mil","no data",true); }
+}
+function advance(o,dt){
+  if(o.gnd||!o.spd) return;
+  const R=6371000, br=rad(o.trk), la=rad(o.lat), lo=rad(o.lon), ang=o.spd*dt/R;
+  const la2=Math.asin(Math.sin(la)*Math.cos(ang)+Math.cos(la)*Math.sin(ang)*Math.cos(br));
+  const lo2=lo+Math.atan2(Math.sin(br)*Math.sin(ang)*Math.cos(la),Math.cos(ang)-Math.sin(la)*Math.sin(la2));
+  o.lat=deg(la2); o.lon=deg(lo2);
+  o.pos=CS.Cartesian3.fromDegrees(o.lon,o.lat,o.alt||0); o.bb.position=o.pos;
+}
+
+/* ---------- satellites ---------- */
+const satPoints = scene.primitives.add(new CS.PointPrimitiveCollection());
+const orbitLines = scene.primitives.add(new CS.PolylineCollection());
+let sats=[];
+async function loadSats(){
+  try{
+    const groups=["stations","visual"]; const seen=new Set(); const out=[];
+    for(const g of groups){
+      let txt; try{ txt=await getText("https://celestrak.org/NORAD/elements/gp.php?GROUP="+g+"&FORMAT=tle"); }catch(e){ if(g==="stations") throw e; continue; }
+      const L=txt.split(/\r?\n/).map(s=>s.trimEnd()).filter(Boolean);
+      for(let i=0;i+2<L.length;i+=3){
+        const id=L[i+1].substring(2,7); if(seen.has(id)) continue; seen.add(id);
+        let rec; try{ rec=satellite.twoline2satrec(L[i+1],L[i+2]); }catch(e){ continue; }
+        if(!rec||rec.error) continue;
+        out.push({name:L[i].trim(),norad:id,rec});
+      }
+    }
+    sats=out; satPoints.removeAll();
+    sats.forEach((s,i)=>{
+      const iss=/ISS \(ZARYA\)/.test(s.name);
+      s.pt=satPoints.add({position:CS.Cartesian3.ZERO,pixelSize:iss?9:5,color:iss?CS.Color.fromCssColorString("#ffffff"):CS.Color.fromCssColorString("#6fb8ff"),
+        outlineColor:CS.Color.BLACK.withAlpha(.6),outlineWidth:1,id:{kind:"sat",key:i},
+        scaleByDistance:new CS.NearFarScalar(1e6,1.4,6e7,.8)});
+    });
+    satPoints.show=layerOn.sats; tickSats();
+    setCount("sats",fmt(sats.length));
+  }catch(e){ console.warn("sats",e); setCount("sats","no data",true); }
+}
+function tickSats(){
+  if(!layerOn.sats||!sats.length||typeof satellite==="undefined") return;
+  const now=new Date(), gmst=satellite.gstime(now);
+  for(const s of sats){
+    const pv=satellite.propagate(s.rec,now); if(!pv.position||!pv.velocity) continue;
+    const gd=satellite.eciToGeodetic(pv.position,gmst);
+    s.lat=satellite.degreesLat(gd.latitude); s.lon=satellite.degreesLong(gd.longitude); s.alt=gd.height;
+    s.vel=Math.hypot(pv.velocity.x,pv.velocity.y,pv.velocity.z);
+    s.pos=CS.Cartesian3.fromDegrees(s.lon,s.lat,s.alt*1000); s.pt.position=s.pos;
+  }
+}
+function drawOrbit(s){
+  orbitLines.removeAll(); if(!s||!s.rec) return;
+  const now=new Date(), gmst=satellite.gstime(now), per=2*Math.PI/s.rec.no, pts=[];
+  for(let i=0;i<=120;i++){
+    const pv=satellite.propagate(s.rec,new Date(now.getTime()+i/120*per*60000));
+    if(!pv.position) continue; const e=satellite.eciToEcf(pv.position,gmst);
+    pts.push(new CS.Cartesian3(e.x*1000,e.y*1000,e.z*1000));
+  }
+  if(pts.length>2) orbitLines.add({positions:pts,width:1.6,material:CS.Material.fromType("Color",{color:CS.Color.fromCssColorString("#6fb8ff").withAlpha(.75)})});
+}
+
+/* ---------- earthquakes ---------- */
+const quakePts = scene.primitives.add(new CS.PointPrimitiveCollection());
+let quakes=[];
+async function loadQuakes(){
+  try{
+    const j=await getJSON("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson");
+    quakePts.removeAll(); quakes=[];
+    (j.features||[]).forEach(f=>{
+      const [lon,lat,depth]=f.geometry.coordinates, m=f.properties.mag||0; if(m<=0) return;
+      const q={mag:m,place:f.properties.place,time:f.properties.time,depth,lat,lon,pos:CS.Cartesian3.fromDegrees(lon,lat,0),url:f.properties.url};
+      const i=quakes.push(q)-1;
+      quakePts.add({position:q.pos,pixelSize:Math.min(26,4+m*3),color:CS.Color.fromCssColorString("#ff6b5e").withAlpha(.6),
+        outlineColor:CS.Color.fromCssColorString("#ff6b5e"),outlineWidth:1.5,id:{kind:"quake",key:i}});
+    });
+    quakePts.show=layerOn.quakes; setCount("quakes",fmt(quakes.length));
+  }catch(e){ console.warn("quakes",e); setCount("quakes","no data",true); }
+}
+
+/* ---------- public cameras ---------- */
+const camPts = scene.primitives.add(new CS.PointPrimitiveCollection());
+let cams=[];
+const CAM_SOURCES=[
+  { name:"London (TfL)", load: async()=>{
+      const j=await getJSON("https://api.tfl.gov.uk/Place/Type/JamCam",25000);
+      return j.map(p=>{ const g=k=>{ const x=(p.additionalProperties||[]).find(a=>a.key===k); return x&&x.value; };
+        return {name:p.commonName,lat:p.lat,lon:p.lon,img:g("imageUrl"),video:g("videoUrl")}; });
+  }},
+  { name:"Austin (City of Austin)", load: async()=>{
+      const j=await getJSON("https://data.austintexas.gov/resource/b4k4-adkb.json?$limit=3000",25000);
+      return j.map(d=>{ const L=d.location; let lat,lon;
+        if(L&&L.coordinates){ lon=+L.coordinates[0]; lat=+L.coordinates[1]; }
+        else if(L&&L.latitude){ lat=+L.latitude; lon=+L.longitude; }
+        else { lat=+d.location_latitude; lon=+d.location_longitude; }
+        return {name:d.location_name||("Camera "+d.camera_id),lat,lon,img:d.screenshot_address}; });
+  }},
+  { name:"California (Caltrans)", load: async()=>{
+      const res=await Promise.allSettled(Array.from({length:12},(_,i)=>{ const n=i+1, p=String(n).padStart(2,"0");
+        return getJSON("https://cwwp2.dot.ca.gov/data/d"+n+"/cctv/cctvStatusD"+p+".json",25000); }));
+      const out=[];
+      for(const r of res){ if(r.status!=="fulfilled") continue;
+        for(const e of (r.value.data||[])){ const c=e.cctv; if(!c||c.inService==="false") continue; const loc=c.location||{};
+          const img=c.imageData&&c.imageData.static&&c.imageData.static.currentImageURL;
+          const hls=c.imageData&&c.imageData.streamingVideoURL;
+          out.push({name:loc.locationName||loc.nearbyPlace||"Caltrans camera",lat:+loc.latitude,lon:+loc.longitude,img,hls:hls||undefined}); } }
+      if(!out.length) throw new Error("no Caltrans data");
+      return out;
+  }},
+  { name:"Finland (Digitraffic)", load: async()=>{
+      const j=await getJSON("https://tie.digitraffic.fi/api/weathercam/v1/stations",25000);
+      return (j.features||[]).map(f=>{ const pr=f.properties||{}, ps=(pr.presets||[])[0];
+        return {name:String(pr.name||pr.id||"Road camera").replace(/_/g," "),lat:f.geometry.coordinates[1],lon:f.geometry.coordinates[0],
+          img:ps?"https://weathercam.digitraffic.fi/"+ps.id+".jpg":null}; });
+  }}
+];
+const windyKey=(localStorage.getItem("eoe_windy")||"").trim();
+let baseCams=[], windyCams=[], myCams=[], roadsOnly=false;
+function parseMedia(raw){
+  let u; try{ u=new URL(String(raw).trim()); }catch(e){ return null; }
+  if(u.protocol!=="https:") return null;
+  const h=u.hostname.replace(/^www\./,"");
+  const q="autoplay=1&mute=1&playsinline=1&rel=0";
+  if(h==="youtu.be") return {yt:"https://www.youtube.com/embed/"+u.pathname.slice(1)+"?"+q};
+  if(h==="youtube.com"||h.endsWith(".youtube.com")){
+    let id=u.searchParams.get("v"); const m=u.pathname.match(/^\/(?:live|embed|shorts)\/([\w-]{6,})/); if(!id&&m) id=m[1];
+    const ch=u.pathname.match(/^\/channel\/(UC[\w-]+)/);
+    if(id) return {yt:"https://www.youtube.com/embed/"+id+"?"+q};
+    if(ch) return {yt:"https://www.youtube.com/embed/live_stream?channel="+ch[1]+"&"+q};
+    return null;
+  }
+  if(/\.m3u8$/i.test(u.pathname)) return {hls:u.href};
+  if(/\.(mp4|webm)$/i.test(u.pathname)) return {video:u.href};
+  return {img:u.href};
+}
+function loadMyCams(){
+  let list=[]; try{ list=JSON.parse(localStorage.getItem("eoe_mycams")||"[]"); }catch(e){}
+  myCams=list.map(m=>{ const med=parseMedia(m.link); if(!med||!isFinite(+m.lat)||!isFinite(+m.lon)) return null;
+    return Object.assign({name:m.name||"My camera",lat:+m.lat,lon:+m.lon,src:"My cameras",mine:true,link:m.link,pos:CS.Cartesian3.fromDegrees(+m.lon,+m.lat,5)},med); }).filter(Boolean);
+}
+function rebuildCams(){
+  const so=sel&&sel.kind==="cam"?getObj(sel):null;
+  cams=[...baseCams,...(roadsOnly?windyCams.filter(c=>c.road):windyCams),...myCams];
+  camPts.removeAll();
+  cams.forEach((c,i)=>camPts.add({position:c.pos,pixelSize:c.mine?8:6,color:CS.Color.fromCssColorString(c.mine?"#ff8fd0":"#c58bff"),
+    outlineColor:CS.Color.fromCssColorString("#1a0f26"),outlineWidth:1.2,id:{kind:"cam",key:i},distanceDisplayCondition:new CS.DistanceDisplayCondition(0,9e6)}));
+  camPts.show=layerOn.cams;
+  setCount("cams",cams.length?fmt(cams.length):"no data",!cams.length);
+  if(so){ const k=cams.indexOf(so); if(k<0) deselect(); else sel.key=k; }
+}
+async function loadCams(){
+  setCount("cams","loading"); loadMyCams();
+  const results=await Promise.allSettled(CAM_SOURCES.map(s=>s.load().then(list=>list.map(c=>Object.assign(c,{src:s.name})))));
+  const all=[], failed=[];
+  results.forEach((r,i)=>{ if(r.status==="fulfilled") all.push(...r.value); else { failed.push(CAM_SOURCES[i].name); console.warn("cams",CAM_SOURCES[i].name,r.reason); } });
+  baseCams=all.filter(c=>isFinite(c.lat)&&isFinite(c.lon)&&typeof c.img==="string"&&c.img).map(c=>{
+    c.img=c.img.replace(/^http:/,"https:"); if(c.video) c.video=c.video.replace(/^http:/,"https:"); if(c.hls) c.hls=c.hls.replace(/^http:/,"https:");
+    c.pos=CS.Cartesian3.fromDegrees(c.lon,c.lat,5); return c; });
+  rebuildCams();
+  if(failed.length&&baseCams.length) toast("Could not load cameras from: "+failed.join(", ")+".");
+  if(!cams.length) toast("Camera lists could not load. Check your connection and try again.");
+  loadWindy();
+}
+async function loadWindy(){
+  if(!windyKey) return;
+  let list=[]; const raw=localStorage.getItem("eoe_windy_list2"); let cached=null; try{ cached=raw?JSON.parse(raw):null; }catch(e){}
+  if(cached&&cached.list&&cached.list.length&&Date.now()-cached.t<864e5) list=cached.list;
+  else{
+    const H={"x-windy-api-key":windyKey}; let ok=true;
+    for(let off=0;off<=950;off+=50){
+      try{
+        const j=await getJSON("https://api.windy.com/webcams/api/v3/webcams?lang=en&limit=50&offset="+off+"&countries=IN&include=location,categories",20000,H);
+        const w=j.webcams||[];
+        w.forEach(x=>{ if(x.location&&isFinite(x.location.latitude)&&isFinite(x.location.longitude)) list.push({id:x.webcamId,name:x.title||"India camera",lat:x.location.latitude,lon:x.location.longitude,road:(x.categories||[]).some(c=>/traffic/i.test((c.id||"")+" "+(c.name||"")))}); });
+        if(w.length<50||off+50>=(j.total||0)) break;
+      }catch(e){ console.warn("windy",e); ok=false; break; }
+    }
+    if(list.length&&ok) localStorage.setItem("eoe_windy_list2",JSON.stringify({t:Date.now(),list}));
+    if(!list.length){ toast("India cameras did not load. Check that your Windy key is correct, or try again later."); return; }
+  }
+  windyCams=list.map(x=>({name:x.name,lat:x.lat,lon:x.lon,road:!!x.road,src:"India (Windy)",windyId:x.id,pos:CS.Cartesian3.fromDegrees(x.lon,x.lat,5)}));
+  rebuildCams();
+}
+async function windyDetail(o){
+  const j=await getJSON("https://api.windy.com/webcams/api/v3/webcams/"+o.windyId+"?lang=en&include=images,urls",20000,{"x-windy-api-key":windyKey});
+  const im=j.images&&j.images.current;
+  return {img:im&&(im.preview||im.thumbnail||im.icon), page:j.urls&&(j.urls.detail||j.urls.provider)};
+}
+
+/* ---- camera media: live video, YouTube, photo with replay buffer ---- */
+let camTimer=null, camHls=null, frames=[], viewing=false;
+function unmountCam(){
+  clearInterval(camTimer); camTimer=null;
+  if(camHls){ try{ camHls.destroy(); }catch(e){} camHls=null; }
+  frames.forEach(f=>{ try{ f.b.close(); }catch(e){} }); frames=[]; viewing=false;
+}
+function camOff(w,msg){ w.innerHTML='<div class="camoff">'+msg+'</div>'; const r=$("#replay"); if(r) r.style.display="none"; }
+function captureFrame(p){
+  if(typeof createImageBitmap!=="function") return;
+  createImageBitmap(p).then(b=>{
+    frames.push({b,t:Date.now()}); while(frames.length>40){ try{ frames.shift().b.close(); }catch(e){} }
+    const sc=$("#scrub"); if(sc){ sc.max=frames.length-1; if(!viewing) sc.value=frames.length-1; }
+  }).catch(()=>{});
+}
+function showFrame(i){
+  const cv=$("#camcanvas"), im=$("#camimg"); if(!cv||!im) return;
+  if(!viewing||!frames.length){ cv.style.display="none"; im.style.display="block"; $("#rtime").textContent=""; return; }
+  const f=frames[Math.min(i,frames.length-1)];
+  cv.width=f.b.width; cv.height=f.b.height; cv.getContext("2d").drawImage(f.b,0,0);
+  im.style.display="none"; cv.style.display="block"; $("#rtime").textContent="-"+Math.round((Date.now()-f.t)/1000)+" s";
+}
+function mountStill(o,w){
+  w.innerHTML='<img class="cam" id="camimg" referrerpolicy="no-referrer" alt="Live camera view"><canvas class="cam" id="camcanvas" style="display:none"></canvas>';
+  $("#replay").style.display="flex"; $("#camattr").textContent="Photo cameras publish a new picture every few seconds to minutes. Drag the slider to replay the last two minutes we captured.";
+  const img=$("#camimg"); let first=true;
+  const pull=()=>{
+    const u=o.img+(o.img.includes("?")?"&":"?")+"_t="+Date.now(); const p=new Image(); p.referrerPolicy="no-referrer";
+    p.onload=()=>{ first=false; if(!img.isConnected) return; if(!viewing) img.src=u; captureFrame(p); };
+    p.onerror=()=>{ if(first&&img.isConnected) camOff(w,"This camera is offline right now. Try another one nearby."); };
+    p.src=u;
+  };
+  pull(); camTimer=setInterval(pull,3000);
+}
+function mountVideo(o,w,url,isHls){
+  w.innerHTML='<video class="cam" id="camvid" autoplay muted loop playsinline controls></video>';
+  const v=$("#camvid"); const fallback=()=>{ if(!v.isConnected) return; if(o.img) mountStill(o,w); else camOff(w,"This video is not available right now. Try another camera."); };
+  if(isHls){
+    if(typeof Hls!=="undefined"&&Hls.isSupported()){
+      camHls=new Hls({lowLatencyMode:true}); camHls.loadSource(url); camHls.attachMedia(v);
+      camHls.on(Hls.Events.ERROR,(e,d)=>{ if(d&&d.fatal){ if(camHls){ camHls.destroy(); camHls=null; } fallback(); } });
+    } else if(v.canPlayType("application/vnd.apple.mpegurl")){ v.src=url; v.onerror=fallback; }
+    else fallback();
+  } else { v.src=url; v.onerror=fallback; }
+  const p=v.play&&v.play(); if(p&&p.catch) p.catch(()=>{});
+}
+function mountCam(o){
+  unmountCam(); const w=$("#camwrap"); if(!w||!o) return; $("#replay").style.display="none";
+  if(o.yt){ w.innerHTML='<iframe class="cam" src="'+esc(o.yt)+'" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" title="Live camera"></iframe>'; return; }
+  if(o.hls){ mountVideo(o,w,o.hls,true); return; }
+  if(o.video){ mountVideo(o,w,o.video,false); return; }
+  if(o.windyId){
+    w.innerHTML='<div class="camoff">Loading camera...</div>';
+    const show=()=>windyDetail(o).then(d=>{
+      if(!w.isConnected||getObj(sel)!==o) return;
+      if(!d.img){ camOff(w,"This camera has no picture right now."); return; }
+      if($("#camimg")) $("#camimg").src=d.img;
+      else { w.innerHTML='<img class="cam" id="camimg" referrerpolicy="no-referrer" alt="Camera view">'; $("#camimg").src=d.img; $("#camimg").onerror=()=>camOff(w,"This camera is offline right now. Try another one nearby."); }
+      $("#camattr").innerHTML='Photo updates every 5 to 15 minutes. Webcam provided by <a href="'+esc(d.page||"https://www.windy.com/webcams")+'" target="_blank" rel="noopener">windy.com</a>.';
+    }).catch(()=>{ if(w.isConnected) camOff(w,"Could not load this camera from Windy. Try again later."); });
+    show(); camTimer=setInterval(show,300000); return;
+  }
+  mountStill(o,w);
+}
+function nearestCam(o,maxKm){
+  if(!o||!o.pos||!cams.length) return -1; let best=-1, bd=Infinity;
+  cams.forEach((c,i)=>{ const d=CS.Cartesian3.distance(o.pos,c.pos); if(d<bd){ bd=d; best=i; } });
+  return bd<=maxKm*1000?best:-1;
+}
+function nearCam(){
+  const i=nearestCam(getObj(sel),60);
+  if(i<0){ toast("No public camera within 60 km of this."); return; }
+  if(!layerOn.cams) toggleLayer("cams");
+  select({kind:"cam",key:i}); startTrack();
+}
+
+/* ---------- layer toggles ---------- */
+let cityTileset=null;
+async function toggleLayer(id){
+  layerOn[id]=!layerOn[id]; $("#chip-"+id).classList.toggle("on",layerOn[id]);
+  if(id==="flights"){ stores.flights.bb.show=layerOn.flights; if(layerOn.flights){ lastOpenSky=0; pollFlights(); } else setCount("flights",""); }
+  if(id==="mil"){ stores.mil.bb.show=layerOn.mil; if(layerOn.mil) pollMil(); else setCount("mil",""); }
+  if(id==="sats"){ satPoints.show=layerOn.sats; if(layerOn.sats){ if(!sats.length) loadSats(); else tickSats(); } }
+  if(id==="quakes"){ quakePts.show=layerOn.quakes; if(layerOn.quakes&&!quakes.length) loadQuakes(); }
+  if(id==="cams"){ camPts.show=layerOn.cams; $("#camJump").style.display=layerOn.cams?"flex":"none"; if(layerOn.cams&&!cams.length) loadCams(); }
+  if(id==="cities"){
+    try{
+      if(layerOn.cities){
+        setCount("cities","loading");
+        cityTileset=await CS.Cesium3DTileset.fromIonAssetId(2275207);
+        scene.primitives.add(cityTileset); scene.globe.show=false; setCount("cities","on");
+      } else if(cityTileset){ scene.primitives.remove(cityTileset); cityTileset=null; scene.globe.show=true; setCount("cities",""); }
+    }catch(e){ console.warn(e); layerOn.cities=false; $("#chip-cities").classList.remove("on"); setCount("cities","failed",true); scene.globe.show=true; toast("Could not load 3D cities. Check your Cesium ion token."); }
+  }
+}
+
+/* ---------- selection, tracking, cockpit ---------- */
+let sel=null, cockpit=false;
+const trackEnt = viewer.entities.add({
+  position:new CS.CallbackProperty(()=>{ const o=getObj(sel); return (o&&o.pos)||CS.Cartesian3.fromDegrees(0,0,-1e6); },false),
+  point:{pixelSize:1,color:CS.Color.TRANSPARENT}, viewFrom:new CS.Cartesian3(0,-3500,2200)
+});
+function getObj(s){
+  if(!s) return null;
+  if(s.kind==="flights") return stores.flights.map.get(s.key);
+  if(s.kind==="mil") return stores.mil.map.get(s.key);
+  if(s.kind==="sat") return sats[s.key];
+  if(s.kind==="quake") return quakes[s.key];
+  if(s.kind==="cam") return cams[s.key];
+  return null;
+}
+const row=(k,v)=>"<dt>"+k+"</dt><dd class=\"num\">"+v+"</dd>";
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function renderCard(){
+  const card=$("#card"); const o=getObj(sel);
+  if(!sel){ card.style.display="none"; card.dataset.key=""; return; }
+  if(!o){ card.innerHTML="<h3>Contact lost</h3><div class=\"sub\">This target is no longer in the feed.</div><div class=\"acts\"><button class=\"act\" data-a=\"close\">Close</button></div>"; card.style.display="block"; return; }
+  let h="";
+  if(sel.kind==="flights"||sel.kind==="mil"){
+    h+="<h3>"+esc(o.call)+"</h3><div class=\"sub\">"+(o.mil?"Military aircraft":"Aircraft")+(o.type?" · "+esc(o.type):"")+(o.reg?" · "+esc(o.reg):"")+"</div><dl>";
+    h+=row("Altitude",o.gnd?"On ground":fmt(o.alt/0.3048)+" ft")+row("Speed",fmt(o.spd/0.5144)+" kt")+row("Heading",fmt(o.trk)+"°")+row("Position",o.lat.toFixed(3)+", "+o.lon.toFixed(3))+row("ID",esc(o.key))+row("Source",esc(o.src))+"</dl>";
+    h+="<div class=\"acts\"><button class=\"act pri\" data-a=\"track\">Follow</button><button class=\"act\" data-a=\"cockpit\">Cockpit</button><button class=\"act\" data-a=\"nearcam\">Nearest camera</button><button class=\"act\" data-a=\"close\">Close</button></div>";
+  } else if(sel.kind==="sat"){
+    h+="<h3>"+esc(o.name)+"</h3><div class=\"sub\">Satellite · NORAD "+o.norad+"</div><dl>";
+    h+=row("Altitude",fmt(o.alt)+" km")+row("Speed",fmt(o.vel,2)+" km/s")+row("Over",(o.lat||0).toFixed(2)+", "+(o.lon||0).toFixed(2))+row("Period",fmt(2*Math.PI/o.rec.no,1)+" min")+"</dl>";
+    h+="<div class=\"acts\"><button class=\"act pri\" data-a=\"track\">Follow</button><button class=\"act\" data-a=\"close\">Close</button></div>";
+  } else if(sel.kind==="quake"){
+    h+="<h3>Magnitude "+o.mag.toFixed(1)+"</h3><div class=\"sub\">"+esc(o.place||"Earthquake")+"</div><dl>";
+    h+=row("Depth",fmt(o.depth,1)+" km")+row("Time (UTC)",new Date(o.time).toUTCString().slice(5,25))+row("Position",o.lat.toFixed(2)+", "+o.lon.toFixed(2))+"</dl>";
+    h+="<div class=\"acts\"><button class=\"act pri\" data-a=\"track\">Fly to</button><button class=\"act\" data-a=\"nearcam\">Nearest camera</button><button class=\"act\" data-a=\"close\">Close</button></div>";
+  } else if(sel.kind==="cam"){
+    const feed=o.hls?"Live video":o.yt?"Live video (YouTube)":o.video?"Video clip, repeating":o.windyId?"Photo, every 5 to 15 min":"Photo, refreshed every 3 s";
+    h+="<h3>"+esc(o.name)+"</h3><div class=\"sub\">Public camera · "+esc(o.src)+"</div>";
+    h+="<div class=\"camwrap\" id=\"camwrap\"></div><div id=\"replay\" class=\"replay\"><input type=\"range\" id=\"scrub\" min=\"0\" max=\"0\" value=\"0\" aria-label=\"Replay recent frames\"><button class=\"mini\" data-a=\"live\">Live</button><span id=\"rtime\" class=\"num\"></span></div><div id=\"camattr\"></div><dl>";
+    h+=row("Feed",feed)+row("Position",o.lat.toFixed(4)+", "+o.lon.toFixed(4))+"</dl>";
+    h+="<div class=\"acts\"><button class=\"act pri\" data-a=\"track\">Fly to</button>"+((o.img||o.windyId)&&!o.hls&&!o.yt&&!o.video?"<button class=\"act\" data-a=\"enlarge\">Enlarge</button>":"")+(o.mine?"<button class=\"act\" data-a=\"removecam\">Remove</button>":"")+"<button class=\"act\" data-a=\"close\">Close</button></div>";
+  }
+  const k=sel.kind+":"+sel.key, tmp=document.createElement("div"); tmp.innerHTML=h;
+  const oldDl=card.querySelector("dl"), newDl=tmp.querySelector("dl");
+  if(card.dataset.key===k&&oldDl&&newDl&&card.style.display==="block"){ oldDl.innerHTML=newDl.innerHTML; return; }
+  card.dataset.key=k; card.innerHTML=h; card.style.display="block"; if(sel.kind==="cam") mountCam(o);
+}
+$("#card").addEventListener("click",e=>{
+  const a=e.target.closest("[data-a]"); if(!a) return;
+  const act=a.dataset.a;
+  if(act==="close") deselect();
+  if(act==="track") startTrack();
+  if(act==="cockpit") startCockpit();
+  if(act==="nearcam") nearCam();
+  if(act==="enlarge"){ const im=$("#camimg"); if(im){ $("#lbimg").src=im.src; $("#lightbox").style.display="flex"; } }
+  if(act==="live"){ viewing=false; const sc=$("#scrub"); if(sc) sc.value=sc.max; showFrame(0); }
+  if(act==="removecam"){
+    const o=getObj(sel); if(!o||!o.mine) return;
+    let list=[]; try{ list=JSON.parse(localStorage.getItem("eoe_mycams")||"[]"); }catch(e){}
+    localStorage.setItem("eoe_mycams",JSON.stringify(list.filter(m=>!(m.link===o.link&&m.name===o.name))));
+    deselect(); loadMyCams(); rebuildCams(); toast("Camera removed.");
+  }
+});
+$("#card").addEventListener("error",e=>{
+  if(e.target&&(e.target.id==="camimg")){ const d=document.createElement("div"); d.className="camoff"; d.textContent="This camera is offline right now. Try another one nearby."; e.target.replaceWith(d); }
+},true);
+$("#card").addEventListener("input",e=>{
+  if(!e.target||e.target.id!=="scrub"||!frames.length) return;
+  const i=+e.target.value; viewing=i<frames.length-1; showFrame(i);
+});
+$("#lightbox").addEventListener("click",()=>{ $("#lightbox").style.display="none"; });
+function select(id){
+  if(cockpit) exitCockpit(); unmountCam();
+  sel=id; const o=getObj(sel); renderCard();
+  if(sel.kind==="sat") drawOrbit(o); else orbitLines.removeAll();
+}
+function deselect(){ exitCockpit(); unmountCam(); viewer.trackedEntity=undefined; sel=null; orbitLines.removeAll(); renderCard(); }
+function startTrack(){
+  const o=getObj(sel); if(!o) return; exitCockpit();
+  trackEnt.viewFrom = sel.kind==="sat" ? new CS.Cartesian3(0,-3.2e6,1.6e6) : sel.kind==="quake" ? new CS.Cartesian3(0,-45000,30000) : sel.kind==="cam" ? new CS.Cartesian3(0,-1200,700) : new CS.Cartesian3(0,-3500,2200);
+  viewer.trackedEntity=trackEnt;
+}
+function startCockpit(){
+  const o=getObj(sel); if(!o||!(sel.kind==="flights"||sel.kind==="mil")) return;
+  viewer.trackedEntity=undefined; cockpit=true; o.bb.show=false;
+  scene.screenSpaceCameraController.enableInputs=false;
+  $("#exitCockpit").style.display="block"; $("#reticle").style.display="block"; $("#card").style.display="none";
+}
+function exitCockpit(){
+  if(!cockpit) return; cockpit=false;
+  const o=getObj(sel); if(o&&o.bb) o.bb.show=true;
+  scene.screenSpaceCameraController.enableInputs=true; camera.lookAtTransform(CS.Matrix4.IDENTITY);
+  $("#exitCockpit").style.display="none"; $("#reticle").style.display="none"; renderCard();
+}
+scene.preRender.addEventListener(()=>{
+  if(!cockpit) return;
+  const o=getObj(sel); if(!o||!o.pos){ exitCockpit(); return; }
+  const c=CS.Cartographic.fromCartesian(o.pos);
+  camera.setView({destination:CS.Cartesian3.fromRadians(c.longitude,c.latitude,c.height+25),
+    orientation:{heading:rad(o.trk||0),pitch:rad(-4),roll:0}});
+});
+$("#exitCockpit").addEventListener("click",exitCockpit);
+
+const handler=new CS.ScreenSpaceEventHandler(viewer.canvas);
+handler.setInputAction(click=>{
+  const p=scene.pick(click.position,22,22);
+  if(CS.defined(p)&&p.id&&p.id.kind) select(p.id); else if(!cockpit) deselect();
+},CS.ScreenSpaceEventType.LEFT_CLICK);
+
+/* ---------- sensor looks ---------- */
+const STYLES=[
+  {k:"Normal",f:""},
+  {k:"Night vision",f:"grayscale(1) brightness(1.35) contrast(1.5) sepia(1) hue-rotate(52deg) saturate(5)"},
+  {k:"Thermal",f:"grayscale(1) contrast(1.7) brightness(1.1) invert(.08)"},
+  {k:"CRT",f:"contrast(1.18) saturate(1.35) hue-rotate(-6deg) brightness(1.05)",crt:true},
+  {k:"Noir",f:"grayscale(1) contrast(1.35) brightness(.95)"}
+];
+STYLES.forEach((s,i)=>{
+  const b=document.createElement("button"); b.className="sty"+(i===0?" on":""); b.textContent=(i+1)+"  "+s.k;
+  b.addEventListener("click",()=>setStyle(i)); $("#styleRow").appendChild(b);
+});
+function setStyle(i){
+  const s=STYLES[i]; viewer.canvas.style.filter=s.f||"none"; $("#crt").style.display=s.crt?"block":"none";
+  document.querySelectorAll(".sty").forEach((b,j)=>b.classList.toggle("on",i===j));
+}
+
+/* ---------- search, reset, settings ---------- */
+$("#search").addEventListener("submit",async e=>{
+  e.preventDefault(); const q=$("#q").value.trim(); if(!q) return; $("#q").blur();
+  const m=q.match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
+  if(m){ deselect(); camera.flyTo({destination:CS.Cartesian3.fromDegrees(+m[2],+m[1],25000)}); return; }
+  try{
+    const r=await getJSON("https://nominatim.openstreetmap.org/search?format=json&limit=1&q="+encodeURIComponent(q));
+    if(!r.length){ toast("No place found for \""+q+"\"."); return; }
+    const b=r[0].boundingbox.map(Number); deselect();
+    camera.flyTo({destination:CS.Rectangle.fromDegrees(b[2],b[0],b[3],b[1]),duration:3});
+  }catch(err){ toast("Search failed. Try coordinates like 28.61, 77.20."); }
+});
+$("#reset").addEventListener("click",()=>{ deselect(); camera.flyTo({destination:CS.Cartesian3.fromDegrees(78,20,2.3e7),duration:2.5}); });
+$("#locate").addEventListener("click",()=>{
+  if(!navigator.geolocation){ toast("This browser can't share your location."); return; }
+  toast("Finding your location...");
+  navigator.geolocation.getCurrentPosition(p=>{
+    const la=p.coords.latitude, lo=p.coords.longitude; deselect();
+    camera.flyTo({destination:CS.Cartesian3.fromDegrees(lo,la,30000),duration:3});
+    setTimeout(()=>{ const pos=CS.Cartesian3.fromDegrees(lo,la,5); let bd=Infinity; cams.forEach(c=>{ bd=Math.min(bd,CS.Cartesian3.distance(pos,c.pos)); });
+      toast(bd<=100000?"The nearest public camera is "+fmt(bd/1000)+" km from you.":"No public camera feeds within 100 km of you. Coverage is London, Austin, California and Finland."); },3300);
+  },()=>toast("Location is blocked. Allow location access for this site, or search for a place instead."),{timeout:12000});
+});
+$("#gear").addEventListener("click",()=>{ $("#ionTok").value=ionToken; $("#windyTok").value=windyKey; $("#dlg").style.display="flex"; });
+$("#dlgClose").addEventListener("click",()=>$("#dlg").style.display="none");
+$("#ionSave").addEventListener("click",()=>{ const v=$("#ionTok").value.trim(); if(v) localStorage.setItem("eoe_ion",v); location.reload(); });
+$("#windySave").addEventListener("click",()=>{ const v=$("#windyTok").value.trim(); if(v){ localStorage.setItem("eoe_windy",v); localStorage.removeItem("eoe_windy_list2"); } location.reload(); });
+$("#windyClear").addEventListener("click",()=>{ localStorage.removeItem("eoe_windy"); localStorage.removeItem("eoe_windy_list2"); location.reload(); });
+$("#mcClose").addEventListener("click",()=>$("#dlg2").style.display="none");
+$("#mcCenter").addEventListener("click",()=>{ const c=viewCenter(); $("#mcLat").value=c.lat.toFixed(5); $("#mcLon").value=c.lon.toFixed(5); });
+$("#mcSave").addEventListener("click",()=>{
+  const name=$("#mcName").value.trim(), link=$("#mcLink").value.trim(), lat=parseFloat($("#mcLat").value), lon=parseFloat($("#mcLon").value);
+  if(!name){ toast("Give the camera a name."); return; }
+  if(!/^https:\/\//i.test(link)||!parseMedia(link)){ toast("The link must start with https and be a YouTube, .m3u8, .mp4 or photo link."); return; }
+  if(!isFinite(lat)||!isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180){ toast("Enter a valid latitude and longitude, or tap the map-center button."); return; }
+  let list=[]; try{ list=JSON.parse(localStorage.getItem("eoe_mycams")||"[]"); }catch(e){}
+  list.push({name,link,lat,lon}); localStorage.setItem("eoe_mycams",JSON.stringify(list));
+  loadMyCams(); rebuildCams(); $("#dlg2").style.display="none";
+  ["#mcName","#mcLink","#mcLat","#mcLon"].forEach(i=>$(i).value="");
+  if(!layerOn.cams) toggleLayer("cams");
+  const k=cams.findIndex(c=>c.mine&&c.link===link&&c.name===name); if(k>=0){ select({kind:"cam",key:k}); startTrack(); }
+});
+$("#ionClear").addEventListener("click",()=>{ localStorage.removeItem("eoe_ion"); location.reload(); });
+
+window.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT") return;
+  if(e.key==="Escape"){ if($("#lightbox").style.display==="flex") $("#lightbox").style.display="none"; else if($("#dlg2").style.display==="flex") $("#dlg2").style.display="none"; else if(cockpit) exitCockpit(); else deselect(); }
+  const n=parseInt(e.key,10); if(n>=1&&n<=STYLES.length) setStyle(n-1);
+  if(e.key==="c"||e.key==="C") startCockpit();
+  if(e.key==="h"||e.key==="H"){ const h=$("#hud"); h.style.display=h.style.display==="none"?"flex":"none"; }
+});
+
+/* ---------- HUD + timers ---------- */
+function updateHud(){
+  const c=viewCenter(), h=camera.positionCartographic.height;
+  const alt=h>=1e6?fmt(h/1000)+" km":h>=1000?fmt(h/1000,1)+" km":fmt(h)+" m";
+  $("#hud").innerHTML="<span>View <b>"+c.lat.toFixed(2)+", "+c.lon.toFixed(2)+"</b></span><span>Camera <b>"+alt+"</b></span><span>UTC <b>"+new Date().toISOString().slice(11,19)+"</b></span>";
+}
+setInterval(updateHud,500);
+let tickN=0;
+setInterval(()=>{
+  const dt=1;
+  if(layerOn.flights) stores.flights.map.forEach(o=>advance(o,dt));
+  if(layerOn.mil) stores.mil.map.forEach(o=>advance(o,dt));
+  tickSats();
+  tickN++;
+  if(sel&&sel.kind!=="quake"&&sel.kind!=="cam") renderCard();
+},1000);
+setInterval(()=>{ if(sel&&sel.kind==="sat") drawOrbit(getObj(sel)); },8000);
+setInterval(pollFlights,12000);
+setInterval(pollMil,20000);
+setInterval(loadQuakes,300000);
+let moveT; camera.moveEnd.addEventListener(()=>{ clearTimeout(moveT); moveT=setTimeout(()=>{ if(camera.positionCartographic.height<=2.5e6) pollFlights(); },900); });
+
+pollFlights(); loadSats(); loadQuakes(); loadCams(); updateHud();
+})();
+</script>
+</body>
+</html>
