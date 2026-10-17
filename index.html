@@ -125,6 +125,12 @@
   #cmdin::placeholder{color:var(--dim)}
   #cmdform button{padding:0 16px;min-height:48px;font-weight:600;color:var(--sky)}
   #mic{display:none}
+  #svpanel{position:fixed;right:10px;top:calc(68px + var(--safe-t));width:min(440px,calc(100vw - 20px));z-index:9;padding:12px;display:none}
+  #svpanel h3{margin:0 0 6px;font-size:16px}
+  #svpanel iframe{width:100%;height:280px;border:0;border-radius:10px;background:#000;margin:6px 0}
+  #svpanel p{margin:6px 0;color:var(--dim);font-size:13px}
+  #svpanel a.act{display:block;text-decoration:none;color:#06121d}
+  @media (max-width:900px){ #svpanel{top:auto;left:10px;right:10px;width:auto;bottom:calc(190px + var(--safe-b))} #svpanel iframe{height:200px} }
 </style>
 </head>
 <body>
@@ -158,6 +164,8 @@
 
 <div id="hud" class="panel num"></div>
 
+<div id="svpanel" class="panel"></div>
+
 <div id="cmd">
   <div id="cmdmsg" class="panel" role="status" aria-live="polite"></div>
   <form id="cmdform" class="panel" autocomplete="off">
@@ -176,6 +184,11 @@
       <button class="act pri" id="ionSave">Save and reload</button>
       <button class="act" id="ionClear">Remove token</button>
     </div>
+    <p style="margin-top:16px"><b style="color:var(--ink)">Speed.</b> Smooth mode lowers detail so the globe runs better on tablets and phones. Sharp mode looks best on a laptop.</p>
+    <div class="acts"><button class="act" id="perfSmooth">Smooth</button><button class="act" id="perfSharp">Sharp</button></div>
+    <p style="margin-top:16px"><b style="color:var(--ink)">Street View.</b> Street View is photos taken by Google cars. It is not live video. Without a key, the Street View button opens it in Google Maps. To show it inside this app, paste a Google Maps Embed API key (it needs a Google Cloud account, and you should restrict the key to this site address).</p>
+    <input id="gmapsTok" placeholder="Google Maps Embed API key (optional)" autocomplete="off">
+    <div class="acts"><button class="act pri" id="gmSave">Save key</button><button class="act" id="gmClear">Remove key</button></div>
     <p style="margin-top:16px"><b style="color:var(--ink)">AI commands (optional).</b> The command bar already understands commands like "go to India, Uttar Pradesh, Azamgarh" or "cctv of Oxford Street, London" with no key. To also understand free-form sentences, paste an Anthropic API key. Using it costs a small amount on your Anthropic account. It stays in this browser, and anyone who uses your browser could see it, so do not use this on a shared device.</p>
     <input id="aiTok" placeholder="Anthropic API key (optional)" autocomplete="off">
     <div class="acts"><button class="act pri" id="aiSave">Save key</button><button class="act" id="aiClear">Remove key</button></div>
@@ -206,6 +219,7 @@
 <script src="https://cdn.jsdelivr.net/npm/cesium@1.124.0/Build/Cesium/Cesium.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <script>
 (function(){
 "use strict";
@@ -218,6 +232,7 @@ if (ionToken) CS.Ion.defaultAccessToken = ionToken;
 
 const small = window.matchMedia("(max-width:700px)").matches;
 const touch = ("ontouchstart" in window) || navigator.maxTouchPoints>0;
+const lite = (localStorage.getItem("eoe_perf") || ((touch||small)?"smooth":"sharp"))==="smooth";
 const viewer = new CS.Viewer("globe", {
   baseLayer:false,
   baseLayerPicker:false, geocoder:false, homeButton:false, sceneModePicker:false,
@@ -225,12 +240,12 @@ const viewer = new CS.Viewer("globe", {
   infoBox:false, selectionIndicator:false, msaaSamples:1
 });
 viewer.useBrowserRecommendedResolution=false;
-viewer.resolutionScale=Math.min(window.devicePixelRatio||1, small?1.25:1.5);
-viewer.targetFrameRate=touch?30:60;
+viewer.resolutionScale=Math.min(window.devicePixelRatio||1, lite?1:1.5);
+viewer.targetFrameRate=lite?30:60;
 const scene = viewer.scene, camera = viewer.camera;
-scene.globe.maximumScreenSpaceError = touch?3:2;
+scene.globe.maximumScreenSpaceError = lite?2.2:2;
 scene.fog.enabled = false;
-scene.postProcessStages.fxaa.enabled = !touch;
+scene.postProcessStages.fxaa.enabled = !lite;
 
 /* ---------- base maps ---------- */
 const ESRI="https://services.arcgisonline.com/ArcGIS/rest/services/";
@@ -243,17 +258,22 @@ const BASES={
   streets:()=>[esriTile("World_Street_Map",19,"Map © Esri, HERE, Garmin, OpenStreetMap contributors")],
   dark:()=>[new CS.UrlTemplateImageryProvider({url:"https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",subdomains:["a","b","c","d"],maximumLevel:19,credit:"© OpenStreetMap contributors © CARTO"})]
 };
-let baseName="hybrid";
+let baseName="hybrid", tileErrs=0, transportLayer=null;
+const borderLines=scene.primitives.add(new CS.PolylineCollection());
 function markBase(){ document.querySelectorAll("[data-base]").forEach(b=>b.classList.toggle("on",b.dataset.base===baseName)); }
 function setBase(name){
   const f=BASES[name]; if(!f) return false;
-  viewer.imageryLayers.removeAll(); f().forEach(pv=>viewer.imageryLayers.addImageryProvider(pv));
+  viewer.imageryLayers.removeAll();
+  f().forEach(pv=>{ viewer.imageryLayers.addImageryProvider(pv); pv.errorEvent.addEventListener(()=>{ tileErrs++; if(tileErrs===30) toast("Map tiles are slow or failing to load. Check your connection, or try another Map style."); }); });
+  transportLayer=(name==="hybrid")?viewer.imageryLayers.get(1):null;
   baseName=name; markBase(); return true;
 }
 setBase("hybrid");
 scene.globe.enableLighting = false;
 scene.highDynamicRange = false;
-scene.skyAtmosphere.show = true;
+scene.skyAtmosphere.show = !lite;
+scene.globe.showGroundAtmosphere = !lite;
+if(lite){ scene.sun.show=false; scene.moon.show=false; scene.skyBox.show=false; scene.requestRenderMode=true; scene.maximumRenderTimeChange=0.25; viewer.clock.shouldAnimate=true; }
 if (ionToken) { try { scene.setTerrain(CS.Terrain.fromWorldTerrain()); } catch(e){ console.warn(e); } }
 camera.setView({ destination: CS.Cartesian3.fromDegrees(78, 20, 2.3e7) });
 
@@ -284,7 +304,8 @@ const LAYERS = [
   {id:"mil",     label:"Military",   color:"#ffb547", on:false},
   {id:"sats",    label:"Satellites", color:"#6fb8ff", on:true},
   {id:"quakes",  label:"Earthquakes",color:"#ff6b5e", on:true},
-  {id:"cams",    label:"Public cameras",color:"#c58bff", on:true}
+  {id:"cams",    label:"Public cameras",color:"#c58bff", on:true},
+  {id:"osm",     label:"Mapped CCTV (OSM)",color:"#7bdff2", on:false}
 ];
 if (ionToken) LAYERS.push({id:"cities", label:"3D cities", color:"#9be37a", on:false});
 const layerOn = {};
@@ -373,7 +394,7 @@ function parseOpenSky(j){
 const HUBS=[[40.6,-73.8],[34,-118.4],[41.9,-87.9],[33.6,-84.4],[51.5,-0.5],[50,8.5],[48.9,2.5],[41,29],[25.2,55.4],[28.6,77.1],[19.1,72.9],[13.1,80.2],[1.4,103.9],[35.5,139.8],[31.2,121.8],[22.3,114.2],[-33.9,151.2],[-23.5,-46.6],[-26.1,28.2],[30,31]];
 function samplePoints(){
   const h=camera.positionCartographic.height;
-  if(h>3e6) return {pts:HUBS, nm:250};
+  if(h>3e6) return {pts:HUBS.slice(0,lite?12:20), nm:250};
   const c=viewCenter(); const nm=Math.round(Math.min(250,Math.max(25,h/1852*0.8)));
   const pts=[[c.lat,c.lon]];
   if(h>4e5){
@@ -385,40 +406,50 @@ function samplePoints(){
   }
   return {pts,nm};
 }
-async function fetchPoint(lat,lon,nm){
+const PROXY=u=>"https://corsproxy.io/?url="+encodeURIComponent(u);
+let viaProxy=0, polling=false, flightWarned=false, lastGlobal=0;
+async function fetchPoint(lat,lon,nm,proxy){
   const la=lat.toFixed(3), lo=lon.toFixed(3); let last;
   const urls=["https://api.adsb.lol/v2/point/"+la+"/"+lo+"/"+nm,"https://api.airplanes.live/v2/point/"+la+"/"+lo+"/"+nm,"https://opendata.adsb.fi/api/v2/lat/"+la+"/lon/"+lo+"/dist/"+nm];
-  for(const u of urls){ try{ return await getJSON(u,10000); }catch(e){ last=e; } }
+  for(const u of urls){ try{ return await getJSON(proxy?PROXY(u):u,10000); }catch(e){ last=e; } }
   throw last;
 }
-let polling=false, flightWarned=false, lastGlobal=0;
+async function runPoints(pts,nm,proxy){
+  const res=await Promise.allSettled(pts.map(pt=>fetchPoint(pt[0],pt[1],nm,proxy)));
+  const map=new Map(); let ok=0, err="";
+  res.forEach(r=>{
+    if(r.status==="fulfilled"){ ok++; parseAdsb(r.value,false).forEach(a=>{ if(!a.mil&&a.key) map.set(a.key,a); }); }
+    else err=String((r.reason&&r.reason.message)||r.reason);
+  });
+  return {map,ok,err};
+}
 async function pollFlights(){
   if(!layerOn.flights||polling) return;
   if(camera.positionCartographic.height>3e6){ if(Date.now()-lastGlobal<45000) return; lastGlobal=Date.now(); }
   polling=true;
   try{
-    const s=samplePoints();
-    const res=await Promise.allSettled(s.pts.map(pt=>fetchPoint(pt[0],pt[1],s.nm)));
-    const map=new Map(); let ok=0;
-    res.forEach(r=>{ if(r.status==="fulfilled"){ ok++; parseAdsb(r.value,false).forEach(a=>{ if(!a.mil&&a.key) map.set(a.key,a); }); } });
-    let list=[...map.values()];
-    if(!ok){
+    const s=samplePoints(); const useProxy=viaProxy&&Date.now()-viaProxy<6e5;
+    let r=await runPoints(s.pts,s.nm,useProxy);
+    if(!r.ok&&!useProxy){ viaProxy=Date.now(); r=await runPoints(s.pts,s.nm,true); }
+    let list=[...r.map.values()];
+    if(!r.ok){
       const h=camera.positionCartographic.height; let url="https://opensky-network.org/api/states/all";
       if(h<=2.5e6){ const c=viewCenter(), d=s.nm/60; url+="?lamin="+(c.lat-d).toFixed(2)+"&lamax="+(c.lat+d).toFixed(2)+"&lomin="+(c.lon-d*1.3).toFixed(2)+"&lomax="+(c.lon+d*1.3).toFixed(2); }
-      list=parseOpenSky(await getJSON(url,25000));
+      let j; try{ j=await getJSON(url,25000); }catch(e){ j=await getJSON(PROXY(url),25000); }
+      list=parseOpenSky(j);
     }
-    if(list.length>3500) list=list.slice(0,3500);
+    const cap=lite?1500:3500; if(list.length>cap) list=list.slice(0,cap);
     upsert(stores.flights,list);
     setCount("flights",fmt(stores.flights.map.size)); flightWarned=false;
   }catch(e){
     console.warn("flights",e); setCount("flights","unavailable",true);
-    if(!flightWarned){ flightWarned=true; toast("Live flight feeds could not be reached. Your network or browser may be blocking them."); }
+    if(!flightWarned){ flightWarned=true; toast("Flights unavailable: "+String((e&&e.message)||e)+". Your network may block the flight feeds."); }
   }finally{ polling=false; }
 }
 async function pollMil(){
   if(!layerOn.mil) return;
   try{
-    let j; try{ j=await getJSON("https://api.adsb.lol/v2/mil"); }catch(e){ j=await getJSON("https://api.airplanes.live/v2/mil"); }
+    let j; try{ j=await getJSON("https://api.adsb.lol/v2/mil"); }catch(e){ try{ j=await getJSON("https://api.airplanes.live/v2/mil"); }catch(e2){ j=await getJSON(PROXY("https://api.adsb.lol/v2/mil")); } }
     upsert(stores.mil,parseAdsb(j,true));
     setCount("mil",fmt(stores.mil.map.size));
   }catch(e){ console.warn("mil",e); setCount("mil","unavailable",true); }
@@ -528,6 +559,15 @@ const CAM_SOURCES=[
           out.push({name:loc.locationName||loc.nearbyPlace||"Caltrans camera",lat:+loc.latitude,lon:+loc.longitude,img,hls:hls||undefined}); } }
       if(!out.length) throw new Error("no Caltrans data");
       return out;
+  }},
+  { name:"New York City (NYC DOT)", load: async()=>{
+      const j=await getJSON("https://webcams.nyctmc.org/api/cameras",25000);
+      return (Array.isArray(j)?j:[]).filter(c=>String(c.isOnline)!=="false").map(c=>({name:c.name||("NYC camera "+c.id),lat:+c.latitude,lon:+c.longitude,img:c.imageUrl||("https://webcams.nyctmc.org/api/cameras/"+c.id+"/image")}));
+  }},
+  { name:"Singapore (LTA)", load: async()=>{
+      const j=await getJSON("https://api.data.gov.sg/v1/transport/traffic-images",25000);
+      const cs=(j.items&&j.items[0]&&j.items[0].cameras)||[];
+      return cs.map(c=>({name:"Singapore road camera "+c.camera_id,lat:+c.location.latitude,lon:+c.location.longitude,img:c.image}));
   }},
   { name:"Finland (Digitraffic)", load: async()=>{
       const j=await getJSON("https://tie.digitraffic.fi/api/weathercam/v1/stations",25000);
@@ -685,6 +725,53 @@ function nearCam(){
   select({kind:"cam",key:i}); startTrack();
 }
 
+/* ---------- OpenStreetMap mapped cameras (locations only) ---------- */
+const osmPts = scene.primitives.add(new CS.PointPrimitiveCollection());
+osmPts.show=false;
+let osmList=[], osmBusy=false;
+async function overpass(q){
+  let last;
+  for(const u of ["https://overpass-api.de/api/interpreter?data=","https://overpass.kumi.systems/api/interpreter?data="]){
+    try{ return await getJSON(u+encodeURIComponent(q),30000); }catch(e){ last=e; }
+  }
+  throw last;
+}
+const bbStr=b=>[b.s,b.w,b.n,b.e].map(x=>x.toFixed(5)).join(",");
+const OSM_Q=bb=>'(node["man_made"="surveillance"]('+bb+');node["highway"="speed_camera"]('+bb+'););';
+async function loadOsmView(){
+  if(!layerOn.osm||osmBusy) return;
+  if(camera.positionCartographic.height>2e5){ setCount("osm","zoom in"); return; }
+  const r=camera.computeViewRectangle(); if(!r) return;
+  const cy=deg((r.south+r.north)/2), cx=deg((r.west+r.east)/2), half=0.25;
+  const b={s:Math.max(deg(r.south),cy-half),n:Math.min(deg(r.north),cy+half),w:Math.max(deg(r.west),cx-half),e:Math.min(deg(r.east),cx+half)};
+  osmBusy=true; setCount("osm","loading");
+  try{
+    const j=await overpass("[out:json][timeout:25];"+OSM_Q(bbStr(b))+"out body 3000;");
+    const cur=(sel&&sel.kind==="osmcam")?osmList[sel.key]:null;
+    osmList=(j.elements||[]).filter(x=>x.lat!=null).map(x=>({id:x.id,lat:x.lat,lon:x.lon,tags:x.tags||{},pos:CS.Cartesian3.fromDegrees(x.lon,x.lat,3)}));
+    osmPts.removeAll();
+    osmList.forEach((o,i)=>osmPts.add({position:o.pos,pixelSize:8,color:CS.Color.fromCssColorString("#7bdff2"),outlineColor:CS.Color.BLACK.withAlpha(.7),outlineWidth:1.2,id:{kind:"osmcam",key:i}}));
+    if(cur){ const k=osmList.findIndex(o=>o.id===cur.id); if(k>=0) sel.key=k; else deselect(); }
+    setCount("osm",fmt(osmList.length));
+  }catch(err){ console.warn("osm",err); setCount("osm","unavailable",true); }
+  finally{ osmBusy=false; }
+}
+
+/* ---------- country borders (drawn by the app, always visible) ---------- */
+async function loadBorders(){
+  try{
+    if(typeof topojson==="undefined") return;
+    const topo=await getJSON("https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-"+(lite?"110m":"50m")+".json",30000);
+    const mesh=topojson.mesh(topo,topo.objects.countries,(a,b)=>a!==b);
+    const mat=CS.Material.fromType("Color",{color:CS.Color.WHITE.withAlpha(.75)});
+    mesh.coordinates.forEach(line=>{
+      if(line.length<2) return;
+      const flat=[]; line.forEach(pt=>{ flat.push(pt[0],pt[1],3000); });
+      borderLines.add({positions:CS.Cartesian3.fromDegreesArrayHeights(flat),width:1.3,material:mat});
+    });
+  }catch(e){ console.warn("borders",e); }
+}
+
 /* ---------- layer toggles ---------- */
 let cityTileset=null;
 async function toggleLayer(id){
@@ -693,6 +780,7 @@ async function toggleLayer(id){
   if(id==="mil"){ stores.mil.bb.show=layerOn.mil; if(layerOn.mil) pollMil(); else setCount("mil",""); }
   if(id==="sats"){ satPoints.show=layerOn.sats; if(layerOn.sats){ if(!sats.length) loadSats(); else tickSats(); } }
   if(id==="quakes"){ quakePts.show=layerOn.quakes; if(layerOn.quakes&&!quakes.length) loadQuakes(); }
+  if(id==="osm"){ osmPts.show=layerOn.osm; if(layerOn.osm) loadOsmView(); else setCount("osm",""); }
   if(id==="cams"){ camPts.show=layerOn.cams; $("#camJump").style.display=layerOn.cams?"flex":"none"; if(layerOn.cams&&!cams.length) loadCams(); }
   if(id==="cities"){
     try{
@@ -718,6 +806,7 @@ function getObj(s){
   if(s.kind==="sat") return sats[s.key];
   if(s.kind==="quake") return quakes[s.key];
   if(s.kind==="cam") return cams[s.key];
+  if(s.kind==="osmcam") return osmList[s.key];
   return null;
 }
 const row=(k,v)=>"<dt>"+k+"</dt><dd class=\"num\">"+v+"</dd>";
@@ -744,7 +833,12 @@ function renderCard(){
     h+="<h3>"+esc(o.name)+"</h3><div class=\"sub\">Public camera · "+esc(o.src)+"</div>";
     h+="<div class=\"camwrap\" id=\"camwrap\"></div><div id=\"replay\" class=\"replay\"><input type=\"range\" id=\"scrub\" min=\"0\" max=\"0\" value=\"0\" aria-label=\"Replay recent frames\"><button class=\"mini\" data-a=\"live\">Live</button><span id=\"rtime\" class=\"num\"></span></div><div id=\"camattr\"></div><dl>";
     h+=row("Feed",feed)+row("Position",o.lat.toFixed(4)+", "+o.lon.toFixed(4))+"</dl>";
-    h+="<div class=\"acts\"><button class=\"act pri\" data-a=\"track\">Fly to</button>"+((o.img||o.windyId)&&!o.hls&&!o.yt&&!o.video?"<button class=\"act\" data-a=\"enlarge\">Enlarge</button>":"")+(o.mine?"<button class=\"act\" data-a=\"removecam\">Remove</button>":"")+"<button class=\"act\" data-a=\"close\">Close</button></div>";
+    h+="<div class=\"acts\"><button class=\"act pri\" data-a=\"track\">Fly to</button><button class=\"act\" data-a=\"sv\">Street View</button>"+((o.img||o.windyId)&&!o.hls&&!o.yt&&!o.video?"<button class=\"act\" data-a=\"enlarge\">Enlarge</button>":"")+(o.mine?"<button class=\"act\" data-a=\"removecam\">Remove</button>":"")+"<button class=\"act\" data-a=\"close\">Close</button></div>";
+  } else if(sel.kind==="osmcam"){
+    const t=o.tags||{}, typ=t["surveillance:type"]||t["camera:type"]||(t.highway==="speed_camera"?"speed camera":"camera");
+    h+="<h3>CCTV camera (mapped)</h3><div class=\"sub\">OpenStreetMap · location only, no video feed</div><dl>";
+    h+=row("Type",esc(typ))+row("Setting",esc(t.surveillance||"n/a"))+row("Operator",esc(t.operator||"n/a"))+row("Facing",esc(t["camera:direction"]||t.direction||"n/a"))+row("Position",o.lat.toFixed(5)+", "+o.lon.toFixed(5))+"</dl>";
+    h+="<div class=\"acts\"><button class=\"act pri\" data-a=\"track\">Fly to</button><button class=\"act\" data-a=\"sv\">Street View</button><button class=\"act\" data-a=\"close\">Close</button></div>";
   }
   const k=sel.kind+":"+sel.key, tmp=document.createElement("div"); tmp.innerHTML=h;
   const oldDl=card.querySelector("dl"), newDl=tmp.querySelector("dl");
@@ -758,6 +852,7 @@ $("#card").addEventListener("click",e=>{
   if(act==="track") startTrack();
   if(act==="cockpit") startCockpit();
   if(act==="nearcam") nearCam();
+  if(act==="sv"){ const o=getObj(sel); if(o&&o.lat!=null) openStreetView(o.lat,o.lon); }
   if(act==="enlarge"){ const im=$("#camimg"); if(im){ $("#lbimg").src=im.src; $("#lightbox").style.display="flex"; } }
   if(act==="live"){ viewing=false; const sc=$("#scrub"); if(sc) sc.value=sc.max; showFrame(0); }
   if(act==="removecam"){
@@ -783,7 +878,7 @@ function select(id){
 function deselect(){ exitCockpit(); unmountCam(); viewer.trackedEntity=undefined; sel=null; orbitLines.removeAll(); renderCard(); }
 function startTrack(){
   const o=getObj(sel); if(!o) return; exitCockpit();
-  trackEnt.viewFrom = sel.kind==="sat" ? new CS.Cartesian3(0,-3.2e6,1.6e6) : sel.kind==="quake" ? new CS.Cartesian3(0,-45000,30000) : sel.kind==="cam" ? new CS.Cartesian3(0,-1200,700) : new CS.Cartesian3(0,-3500,2200);
+  trackEnt.viewFrom = sel.kind==="sat" ? new CS.Cartesian3(0,-3.2e6,1.6e6) : sel.kind==="quake" ? new CS.Cartesian3(0,-45000,30000) : (sel.kind==="cam"||sel.kind==="osmcam") ? new CS.Cartesian3(0,-1200,700) : new CS.Cartesian3(0,-3500,2200);
   viewer.trackedEntity=trackEnt;
 }
 function startCockpit(){
@@ -853,7 +948,7 @@ $("#locate").addEventListener("click",()=>{
       toast(bd<=100000?"The nearest public camera is "+fmt(bd/1000)+" km from you.":"No public camera feeds within 100 km of you. Coverage is London, Austin, California and Finland."); },3300);
   },()=>toast("Location is blocked. Allow location access for this site, or search for a place instead."),{timeout:12000});
 });
-$("#gear").addEventListener("click",()=>{ $("#ionTok").value=ionToken; $("#windyTok").value=windyKey; $("#aiTok").value=localStorage.getItem("eoe_ai")||""; $("#dlg").style.display="flex"; });
+$("#gear").addEventListener("click",()=>{ $("#ionTok").value=ionToken; $("#windyTok").value=windyKey; $("#aiTok").value=localStorage.getItem("eoe_ai")||""; $("#gmapsTok").value=localStorage.getItem("eoe_gmaps")||""; $("#dlg").style.display="flex"; });
 $("#dlgClose").addEventListener("click",()=>$("#dlg").style.display="none");
 $("#ionSave").addEventListener("click",()=>{ const v=$("#ionTok").value.trim(); if(v) localStorage.setItem("eoe_ion",v); location.reload(); });
 $("#windySave").addEventListener("click",()=>{ const v=$("#windyTok").value.trim(); if(v){ localStorage.setItem("eoe_windy",v); localStorage.removeItem("eoe_windy_list2"); } location.reload(); });
@@ -882,8 +977,21 @@ window.addEventListener("keydown",e=>{
   if(e.key==="h"||e.key==="H"){ const h=$("#hud"); h.style.display=h.style.display==="none"?"flex":"none"; }
 });
 
+/* ---------- street view ---------- */
+function openStreetView(lat,lon){
+  const key=(localStorage.getItem("eoe_gmaps")||"").trim();
+  const link="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint="+lat.toFixed(6)+","+lon.toFixed(6);
+  const p=$("#svpanel");
+  p.innerHTML='<h3>Street View</h3>'+(key?'<iframe allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps/embed/v1/streetview?key='+encodeURIComponent(key)+'&location='+lat.toFixed(6)+','+lon.toFixed(6)+'&fov=90"></iframe>':'')
+    +'<p>Street View is photos taken by Google cars, not live video. It may not exist on every road.</p>'
+    +'<div class="acts"><a class="act pri" href="'+link+'" target="_blank" rel="noopener">Open Google Street View here</a><button class="act" id="svClose">Close</button></div>';
+  p.style.display="block";
+}
+$("#svpanel").addEventListener("click",e=>{ if(e.target.id==="svClose") $("#svpanel").style.display="none"; });
+
 /* ---------- command bar ---------- */
 let camsReady=Promise.resolve();
+let lastGeo=null;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let msgTimer;
 function say(t){ const m=$("#cmdmsg"); m.textContent=t; m.style.display="block"; clearTimeout(msgTimer); msgTimer=setTimeout(()=>m.style.display="none",16000); }
@@ -927,46 +1035,96 @@ function placeParts(str){
   if(/\s+in\s+/i.test(str)) return str.split(/\s+in\s+/i).map(x=>x.trim()).filter(Boolean).reverse();
   return [str];
 }
+function cleanCmd(t){
+  let x=String(t).trim().replace(/\s+/g," ");
+  const re=/^(?:hey|hi|hello|ok|okay|so|please|pls|plz|bro|bruh|can you|could you|would you|will you|i want to|i wanna|i want you to|i need to|i would like to|let me|just|kindly|now|then)[ ,]+/i;
+  let prev; do{ prev=x; x=x.replace(re,""); }while(x!==prev);
+  return x.replace(/\s+(?:please|pls|plz)$/i,"").replace(/[.!?]+$/,"");
+}
+const ZOOM_H={street:600,building:250,city:25000,town:25000,state:400000,country:3000000,continent:9000000,world:23000000,earth:23000000};
 function parseCommand(text){
-  const t=text.trim().replace(/[.!?]+$/,""), low=t.toLowerCase(); let m;
+  const t=cleanCmd(text), low=t.toLowerCase(); let m;
   if(!t) return [];
   if(/^(help|\?|commands|what can you do)$/.test(low)) return [{t:"help"}];
-  const chunks=t.split(/\s+(?:and then|then|and)\s+(?=(?:show|hide|turn|enable|disable|switch|track|follow|cctv|camera|go|fly|zoom|open|use|reset)\b)/i);
+  const chunks=t.split(/\s+(?:and then|then|and)\s+(?=(?:show|hide|turn|enable|disable|switch|track|follow|cctv|cctvs|camera|cameras|access|find|get|see|view|open|go|fly|zoom|use|reset|street|count|how|take)\b)/i);
   if(chunks.length>1) return chunks.flatMap(parseCommand);
-  if(/^(reset|home|world|whole world|zoom out|show earth|show the world)$/.test(low)) return [{t:"reset"}];
+  if(/^(?:reset|home|go home|take me home|world|whole world|show earth|show the world|zoom out (?:all the way|fully|completely))$/.test(low)
+     ||/\b(?:back to|return to|go back to|reset to|back)\s*(?:the\s+)?(?:normal|default|original|world|earth|home|full)\s*(?:view|globe|earth|zoom)?$/.test(low)
+     ||/^(?:normal|default|original|full|world)\s+view$/.test(low)) return [{t:"reset"}];
+  if((m=low.match(/^zoom\s*(in|out)\b(.*)$/))){
+    const big=/a lot|more|much|way|max|fully|completely|all the way/.test(m[2]);
+    return [{t:"zoom",f:m[1]==="in"?(big?0.15:0.45):(big?6:2.2)}];
+  }
+  if((m=low.match(/^zoom\s*(?:in\s*)?(?:to|at)\s+(?:the\s+)?(street|building|city|town|state|country|continent|world|earth)(?:\s+level)?$/))) return [{t:"zoom",height:ZOOM_H[m[1]]}];
   if(/^nearest\s+(cctv|cameras?|cams?)/.test(low)) return [{t:"nearcam"}];
   if(/^cockpit/.test(low)) return [{t:"cockpit"}];
-  m=low.match(/^(?:access|show|open|get|see|view|watch|find|go to)?\s*(?:me\s+)?(?:the\s+|all\s+)?(?:cctv|cctvs|cameras?|cams?|webcams?)\s+(?:(?:of|at|on|near|in|around|for|from)\s+)?(.+)$/);
-  if(m&&!/^(layer|layers|on|off|view|feed)$/.test(m[1])) return [{t:"cctv",parts:placeParts(t.slice(t.length-m[1].length))}];
-  if(/^(?:access|open|show|get)\s+(?:the\s+)?(?:nearest\s+)?(?:cctv|cameras?)$/.test(low)&&/^(?:access|open|get)/.test(low)) return [{t:"cctv",parts:[]}];
+  m=low.match(/^(?:(?:find out|tell me|let me know|give me|what(?:'s| is)|show me|get me)\s+)?(?:the\s+)?(?:how many|number of|count(?: of)?|total(?: number of)?)\s+(?:public\s+|live\s+|mapped\s+)?(?:cctvs?|cameras?|cams)(?:\s+(?:cctvs?|cameras?|cams))?(?:\s+(?:are\s+)?(?:there|located|present|available))?\s*(?:(?:in|of|at|near|around|within|for)\s+)?(.*)$/);
+  if(m){ const pl=m[1].trim(); return [{t:"count",parts:pl?placeParts(t.slice(t.length-pl.length)):[]}]; }
+  m=low.match(/^(?:show|open|get|access|go to|see|view|take me to)?\s*(?:me\s+)?(?:the\s+)?(?:google\s+)?street\s*view\s*(?:of|at|on|near|in|for)?\s*(.*)$/);
+  if(m){ const pl=m[1].trim(); return [{t:"streetview",parts:pl?placeParts(t.slice(t.length-pl.length)):[]}]; }
+  m=low.match(/^(?:(?:access|show|open|get|see|view|watch|find|go to|give me|connect to)\s+)?(?:me\s+)?(?:the\s+|all\s+|public\s+|live\s+)*(?:cctvs?|cameras?|cams|webcams?)(?:\s+(?:cctvs?|cameras?|cams|webcams?|feeds?|footage|live))*\s*(?:(?:of|at|on|near|in|around|for|from)\s+)?(.*)$/);
+  if(m){
+    const pl=m[1].trim();
+    if(!/^(layers?|on|off|view|feed)$/.test(pl)){
+      const verb=/^(access|open|get|see|view|watch|find|go to|give me|connect to)\b/.test(low);
+      if(pl||verb) return [{t:"cctv",parts:pl?placeParts(t.slice(t.length-pl.length)):[]}];
+      return [{t:"layer",name:"cams",on:true}];
+    }
+  }
   m=low.match(/^(?:hide|turn off|disable|switch off|remove|stop showing)\s+(?:the\s+|all\s+)?(.+?)(?:\s+layer)?$/);
   if(m){ const id=layerOf(m[1]); if(id) return [{t:"layer",name:id,on:false}]; }
   m=low.match(/^(?:show|turn on|enable|switch on|display|add)\s+(?:me\s+)?(?:the\s+|all\s+)?(.+?)(?:\s+layer)?$/);
   if(m&&!/\b(of|in|at|near|over)\b/.test(m[1])){ const id=layerOf(m[1]); if(id) return [{t:"layer",name:id,on:true}]; }
-  m=low.match(/^(?:switch to|use|set|turn on|enable|show|activate|change to|go)?\s*(?:the\s+)?(night vision|nvg|thermal|flir|crt|noir|black and white|normal)(?:\s+(?:mode|look|view|vision))?$/);
+  m=low.match(/^(?:switch to|use|set|turn on|enable|show|activate|change to|go)?\s*(?:the\s+)?(night vision|nvg|thermal|flir|crt|noir|black and white|normal)\s+(?:mode|look|vision)$/)
+    ||low.match(/^(?:switch to|use|set|turn on|enable|show|activate|change to|go)?\s*(?:the\s+)?(night vision|nvg|thermal|flir|crt|noir|black and white)$/);
   if(m) return [{t:"look",i:LOOK_IDX[m[1]]}];
   m=low.match(/^(?:switch to|use|set|show|change to|enable)?\s*(?:the\s+)?(satellite (?:view|map|imagery)|hybrid|streets?(?: map| view)?|google maps?|road map|dark(?: map| mode)?)$/);
   if(m){ const w=m[1]; return [{t:"base",name:/satellite|hybrid/.test(w)?"hybrid":/dark/.test(w)?"dark":"streets"}]; }
   m=low.match(/^(track|follow|find|locate)\s+(?:flight\s+|plane\s+|aircraft\s+)?(.+)$/);
   if(m&&(m[1]==="track"||m[1]==="follow"||/^[a-z]{2,3}\s?\d{1,4}[a-z]?$/.test(m[2])||/^iss$/.test(m[2])||/^[a-z0-9]{6}$/.test(m[2]))) return [{t:"follow",q:t.slice(t.length-m[2].length),verb:m[1]}];
-  m=low.match(/^(?:go to|goto|fly to|take me to|navigate to|zoom to|open|show me|show|search for|search|find|locate|where is)\s+(.+)$/);
+  m=low.match(/^(?:go to|go on|go in|go|goto|fly to|take me to|take me|navigate to|head to|move to|visit|zoom to|zoom into|open|show me|show|search for|search|find|locate|where is)\s+(.+)$/);
   if(m) return [{t:"goto",parts:placeParts(t.slice(t.length-m[1].length))}];
   return [{t:"goto",parts:placeParts(t)}];
 }
 async function doGoto(parts){
   const g=await geocodeParts(parts);
   if(!g) return "I couldn't find \""+parts.join(", ")+"\". Check the spelling, or try fewer details.";
-  deselect(); flyToPlace(g);
+  lastGeo=Object.assign({t:Date.now()},g); deselect(); flyToPlace(g);
   if(g.used<g.total) return "I couldn't find \""+parts.slice(g.used).join(", ")+"\", so I went to "+shortName(g.label)+" instead.";
   return "Flying to "+shortName(g.label)+".";
+}
+function boxAround(lat,lon,half){ return {s:Math.max(-85,lat-half),n:Math.min(85,lat+half),w:lon-half,e:lon+half}; }
+function clampBox(g,half){
+  let [s0,n0,w0,e0]=g.bb; const cy=(s0+n0)/2, cx=(w0+e0)/2; const clamped=(n0-s0>2*half)||(e0-w0>2*half);
+  return {s:Math.max(s0,cy-half),n:Math.min(n0,cy+half),w:Math.max(w0,cx-half),e:Math.min(e0,cx+half),clamped};
+}
+async function osmCountBox(b){
+  const j=await overpass("[out:json][timeout:25];"+OSM_Q(bbStr(b))+"out count;");
+  const tg=j.elements&&j.elements[0]&&j.elements[0].tags; return tg?(+tg.total||0):0;
+}
+const liveIn=b=>cams.filter(c=>c.lat>=b.s&&c.lat<=b.n&&c.lon>=b.w&&c.lon<=b.e).length;
+async function doCount(parts){
+  await camsReady; let g=null;
+  if(parts&&parts.length){ g=await geocodeParts(parts); if(!g) return "I couldn't find \""+parts.join(", ")+"\"."; lastGeo=Object.assign({t:Date.now()},g); }
+  else if(lastGeo&&Date.now()-lastGeo.t<120000) g=lastGeo;
+  let b,name;
+  if(g){ b=clampBox(g,0.25); name=shortName(g.label); }
+  else { const c=viewCenter(); b=boxAround(c.lat,c.lon,0.15); name="the current view"; }
+  let total;
+  try{ total=await osmCountBox(b); }catch(e){ return "I couldn't reach the OpenStreetMap camera database right now. Try again in a minute."; }
+  const live=liveIn(b);
+  if(g){ deselect(); flyToPlace(g); }
+  if(total>0&&!layerOn.osm) await toggleLayer("osm");
+  return "Around "+name+(b.clamped?" (within about 25 km of its center)":"")+": "+fmt(total)+" CCTV and speed cameras are mapped in OpenStreetMap (shown as light-blue dots; locations only, and the real number is higher because volunteers map them). "+fmt(live)+" have a live public feed in this app.";
 }
 async function doCctv(parts){
   await camsReady;
   if(!cams.length) return "Camera lists are not loaded yet. Check your connection and try again.";
   if(!layerOn.cams) await toggleLayer("cams");
   let g=null, center;
-  if(parts&&parts.length){ g=await geocodeParts(parts); if(!g) return "I couldn't find \""+parts.join(", ")+"\"."; center=CS.Cartesian3.fromDegrees(g.lon,g.lat,5); }
-  else { const c=viewCenter(); center=CS.Cartesian3.fromDegrees(c.lon,c.lat,5); }
+  if(parts&&parts.length){ g=await geocodeParts(parts); if(!g) return "I couldn't find \""+parts.join(", ")+"\"."; lastGeo=Object.assign({t:Date.now()},g); }
+  else if(lastGeo&&Date.now()-lastGeo.t<120000) g=lastGeo;
+  if(g) center=CS.Cartesian3.fromDegrees(g.lon,g.lat,5); else { const c=viewCenter(); center=CS.Cartesian3.fromDegrees(c.lon,c.lat,5); }
   const norm=x=>String(x).toLowerCase().replace(/\bstreet\b/g,"st").replace(/\broad\b/g,"rd").replace(/\bavenue\b/g,"ave").replace(/[^a-z0-9 ]/g," ");
   let best=-1, bd=Infinity;
   if(g){
@@ -976,9 +1134,36 @@ async function doCctv(parts){
   }
   if(best<0){ bd=Infinity; cams.forEach((c,i)=>{ const d=CS.Cartesian3.distance(center,c.pos); if(d<bd){ bd=d; best=i; } }); if(bd>30000) best=-1; }
   const where=g?shortName(g.label):"the current view";
-  if(best<0){ if(g){ deselect(); flyToPlace(g); } return "No public camera within 30 km of "+where+". Cameras exist in London, Austin, California, Finland, India (with a Windy key) and any you add with + Add camera."; }
-  select({kind:"cam",key:best}); startTrack();
-  return "Opened camera \""+cams[best].name+"\", "+fmt(bd/1000,1)+" km from "+where+".";
+  if(best>=0){ select({kind:"cam",key:best}); startTrack(); return "Opened live camera \""+cams[best].name+"\", "+fmt(bd/1000,1)+" km from "+where+"."; }
+  let msg="There is no public live camera feed within 30 km of "+where+".";
+  const c0=g?{lat:g.lat,lon:g.lon}:viewCenter(); const b=boxAround(c0.lat,c0.lon,0.1);
+  try{
+    const total=await osmCountBox(b);
+    msg+=" OpenStreetMap lists "+fmt(total)+" mapped CCTV cameras within about 11 km"+(total?"; I turned them on as light-blue dots (locations only, no video).":".");
+    if(total>0&&!layerOn.osm) await toggleLayer("osm");
+  }catch(e){ msg+=" I also couldn't reach the OpenStreetMap camera database."; }
+  if(g){ deselect(); flyToPlace(g); }
+  return msg+" Live public feeds exist for London, New York, Singapore, Austin, California, Finland, India via Windy (add a key), and any you add with + Add camera.";
+}
+async function doStreetView(parts){
+  let lat,lon,name;
+  if(parts&&parts.length){
+    const g=await geocodeParts(parts); if(!g) return "I couldn't find \""+parts.join(", ")+"\".";
+    lastGeo=Object.assign({t:Date.now()},g); lat=g.lat; lon=g.lon; name=shortName(g.label); deselect(); flyToPlace(g);
+  } else {
+    const o=getObj(sel);
+    if(o&&o.lat!=null){ lat=o.lat; lon=o.lon; name="the selected spot"; }
+    else if(lastGeo&&Date.now()-lastGeo.t<120000){ lat=lastGeo.lat; lon=lastGeo.lon; name=shortName(lastGeo.label); }
+    else { const c=viewCenter(); lat=c.lat; lon=c.lon; name="the current view"; }
+  }
+  openStreetView(lat,lon);
+  return "Street View for "+name+" is open. Note: it is photos from Google cars, not live video.";
+}
+async function doZoom(a){
+  const h=camera.positionCartographic.height, c=viewCenter();
+  let nh=a.height!=null?a.height:h*a.f; nh=Math.max(120,Math.min(3e7,nh)); deselect();
+  camera.flyTo({destination:CS.Cartesian3.fromDegrees(c.lon,c.lat,nh),orientation:{heading:0,pitch:rad(-90),roll:0},duration:1.4});
+  return nh<2000?"Zoomed to street level.":"Zoomed "+(nh<h?"in":"out")+".";
 }
 async function doFollow(a){
   const q=a.q.trim().toLowerCase().replace(/\s+/g,"");
@@ -999,7 +1184,7 @@ async function doFollow(a){
 }
 async function runAction(a){
   switch(a.t){
-    case "help": return "Try: go to India, Uttar Pradesh, Azamgarh · cctv of Oxford Street, London · show satellites · hide flights · follow ISS · night vision · streets · reset";
+    case "help": return "Try: go to India, Uttar Pradesh, Azamgarh · cctv of Oxford Street, London · how many cctv cameras in Kolkata · street view of Park Street, Kolkata · zoom in · zoom out back to normal view · show satellites · hide flights · follow ISS · night vision · reset";
     case "reset": deselect(); camera.flyTo({destination:CS.Cartesian3.fromDegrees(78,20,2.3e7),duration:2.5}); return "Back to the whole Earth.";
     case "layer": {
       if(!(a.name in layerOn)) return "That layer isn't available. 3D cities needs a Cesium ion token in Settings.";
@@ -1015,6 +1200,9 @@ async function runAction(a){
       const i=nearestCam({pos},60); if(i<0) return "No public camera within 60 km."; if(!layerOn.cams) await toggleLayer("cams");
       select({kind:"cam",key:i}); startTrack(); return "Opened the nearest camera: "+cams[i].name+".";
     }
+    case "zoom": return await doZoom(a);
+    case "count": return await doCount(a.parts||[]);
+    case "streetview": return await doStreetView(a.parts||[]);
     case "follow": return await doFollow(a);
     case "cockpit": if(sel&&(sel.kind==="flights"||sel.kind==="mil")){ startCockpit(); return "Cockpit view. Tap Leave cockpit to exit."; } return "Select a plane first, then say cockpit.";
   }
@@ -1022,16 +1210,17 @@ async function runAction(a){
 }
 function normAI(a){
   if(!a||typeof a!=="object") return null;
-  if(a.t==="goto"||a.t==="cctv") return {t:a.t,parts:Array.isArray(a.parts)?a.parts.map(String):(a.q?placeParts(String(a.q)):[])};
-  if(a.t==="layer"&&["flights","mil","sats","quakes","cams"].includes(a.name)) return {t:"layer",name:a.name,on:a.on!==false};
+  if(["goto","cctv","count","streetview"].includes(a.t)) return {t:a.t,parts:Array.isArray(a.parts)?a.parts.map(String):(a.q?placeParts(String(a.q)):[])};
+  if(a.t==="layer"&&["flights","mil","sats","quakes","cams","osm"].includes(a.name)) return {t:"layer",name:a.name,on:a.on!==false};
   if(a.t==="look"){ const i={normal:0,night:1,thermal:2,crt:3,noir:4}[a.name]; return i==null?null:{t:"look",i}; }
   if(a.t==="base"&&BASES[a.name]) return {t:"base",name:a.name};
+  if(a.t==="zoom"){ if(ZOOM_H[a.level]) return {t:"zoom",height:ZOOM_H[a.level]}; return {t:"zoom",f:a.dir==="out"?2.2:0.45}; }
   if(a.t==="follow"&&a.q) return {t:"follow",q:String(a.q),verb:"follow"};
   if(a.t==="reset"||a.t==="help") return {t:a.t};
   return null;
 }
 async function askAI(text,key){
-  const system='You turn commands for a 3D Earth app into JSON. Reply with JSON only, no prose: {"actions":[...]}. Action shapes: {"t":"goto","parts":["country","state","city","road"]} (general to specific, only the parts the user gave); {"t":"cctv","parts":[...]} (open the nearest public camera to that place; parts may be empty for the current view); {"t":"layer","name":"flights|mil|sats|quakes|cams","on":true}; {"t":"look","name":"normal|night|thermal|crt|noir"}; {"t":"base","name":"hybrid|streets|dark"}; {"t":"follow","q":"ISS or a flight callsign"}; {"t":"reset"}; {"t":"help"}.';
+  const system='You turn commands for a 3D Earth app into JSON. Reply with JSON only, no prose: {"actions":[...]}. Action shapes: {"t":"goto","parts":["country","state","city","road"]} (general to specific, only the parts the user gave); {"t":"cctv","parts":[...]} (open the nearest live public camera; parts may be empty for the current place); {"t":"count","parts":[...]} (count mapped CCTV cameras in a place); {"t":"streetview","parts":[...]}; {"t":"zoom","dir":"in|out"} or {"t":"zoom","level":"street|city|state|country|world"}; {"t":"layer","name":"flights|mil|sats|quakes|cams|osm","on":true}; {"t":"look","name":"normal|night|thermal|crt|noir"}; {"t":"base","name":"hybrid|streets|dark"}; {"t":"follow","q":"ISS or a flight callsign"}; {"t":"reset"}; {"t":"help"}. The user may give several commands: return several actions in order.';
   const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",
     headers:{"content-type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
     body:JSON.stringify({model:"claude-haiku-5-5",max_tokens:500,system,messages:[{role:"user",content:text}]})});
@@ -1044,7 +1233,7 @@ async function handleCommand(text){
   try{
     let actions=parseCommand(text);
     const key=(localStorage.getItem("eoe_ai")||"").trim(), words=text.trim().split(/\s+/).length;
-    if(key&&words>=5&&!text.includes(",")&&actions.length===1&&actions[0].t==="goto"){
+    if(key&&words>=4&&!text.includes(",")&&actions.length===1&&actions[0].t==="goto"){
       const ai=await askAI(text,key).catch(e=>{ console.warn("ai",e); return null; }); if(ai&&ai.length) actions=ai;
     }
     const out=[]; for(const a of actions){ const r=await runAction(a); if(r) out.push(r); }
@@ -1069,6 +1258,10 @@ if(SR){
     }catch(err){ say("Voice input isn't available in this browser."); }
   });
 }
+$("#perfSmooth").addEventListener("click",()=>{ localStorage.setItem("eoe_perf","smooth"); location.reload(); });
+$("#perfSharp").addEventListener("click",()=>{ localStorage.setItem("eoe_perf","sharp"); location.reload(); });
+$("#gmSave").addEventListener("click",()=>{ const v=$("#gmapsTok").value.trim(); if(v){ localStorage.setItem("eoe_gmaps",v); toast("Google key saved."); } });
+$("#gmClear").addEventListener("click",()=>{ localStorage.removeItem("eoe_gmaps"); $("#gmapsTok").value=""; toast("Google key removed."); });
 $("#aiSave").addEventListener("click",()=>{ const v=$("#aiTok").value.trim(); if(v){ localStorage.setItem("eoe_ai",v); toast("AI key saved."); } $("#dlg").style.display="none"; });
 $("#aiClear").addEventListener("click",()=>{ localStorage.removeItem("eoe_ai"); $("#aiTok").value=""; toast("AI key removed."); });
 
@@ -1092,11 +1285,17 @@ setInterval(()=>{ if(sel&&sel.kind==="sat") drawOrbit(getObj(sel)); },8000);
 setInterval(pollFlights,15000);
 setInterval(pollMil,20000);
 setInterval(loadQuakes,300000);
-let moveT; camera.moveEnd.addEventListener(()=>{ clearTimeout(moveT); moveT=setTimeout(()=>{ if(camera.positionCartographic.height<=3e6) pollFlights(); },1200); });
+let moveT; camera.moveEnd.addEventListener(()=>{ clearTimeout(moveT); moveT=setTimeout(()=>{ if(camera.positionCartographic.height<=3e6) pollFlights(); if(layerOn.osm) loadOsmView(); },1200); });
 camera.percentageChanged=0.15;
-camera.changed.addEventListener(()=>{ camPts.show=layerOn.cams&&camera.positionCartographic.height<1.2e7; });
+function onCamChange(){
+  const h=camera.positionCartographic.height;
+  camPts.show=layerOn.cams&&h<(lite?4e6:1.2e7);
+  borderLines.show=h>2.5e5;
+  if(transportLayer) transportLayer.show=h<6e5;
+}
+camera.changed.addEventListener(onCamChange); onCamChange();
 
-pollFlights(); loadSats(); loadQuakes(); camsReady=loadCams(); updateHud();
+pollFlights(); loadSats(); loadQuakes(); camsReady=loadCams(); loadBorders(); updateHud();
 })();
 </script>
 </body>
